@@ -1,0 +1,9 @@
+message Test1 {
+  optional string foo = 1;
+  required int32 num = 2;
+}
+
+message Test2 {
+  optional string bar = 1;
+  required int32 id = 2;
+}

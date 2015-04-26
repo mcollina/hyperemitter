@@ -1,0 +1,15 @@
+message Event {
+  required string name = 1;
+  required bytes payload = 2;
+}
+
+message EventPeer {
+  required string id = 1;
+  repeated PeerAddress addresses = 2;
+
+  message PeerAddress {
+    required string ip = 1;
+    required int32 port = 2;
+  }
+}
+
