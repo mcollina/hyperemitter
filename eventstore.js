@@ -9,9 +9,10 @@ var net = require('net')
 var cuid = require('cuid')
 var os = require('os')
 var pump = require('pump')
+var fastparallel = require('fastparallel')
 var STOREID = '!!STOREID!!'
 
-function EventStore(db, schema, opts) {
+function EventStore (db, schema, opts) {
   if (!(this instanceof EventStore)) {
     return new EventStore(db, schema, opts)
   }
@@ -22,11 +23,14 @@ function EventStore(db, schema, opts) {
   this._last = []
   this._opts = opts || {}
   this._listening = false
+  this._parallel = fastparallel()
+  this._clients = {}
+  this._lastClient = 0
 
   genWriters(this, this._messages)
 
   var that = this
-  this._hyperlog.heads(function(err, heads) {
+  this._hyperlog.heads(function (err, heads) {
     if (err) { return that.emit('error', err) }
 
     that._last = that._last.concat(heads)
@@ -35,38 +39,51 @@ function EventStore(db, schema, opts) {
   // TODO restore only from a given point
   this._changes = this._hyperlog.createReadStream({ live: true })
 
-  this._changes.on('data', function process(change) {
+  this._changes.on('data', function process (change) {
     var header = headers.Event.decode(change.value)
-    var event;
+    var event
 
     switch (header.name) {
       case 'EventPeer':
         event = headers[header.name].decode(header.payload)
-        that.connect(event.addresses[0])
-        break;
+        if (event.id !== that.id) {
+          that.connect(event.addresses[0].port, event.addresses[0].ip)
+        }
+        break
       default:
         event = that._messages[header.name].decode(header.payload)
         that.emit(header.name, event)
     }
   })
 
-  this._server = net.createServer(function handle(stream) {
-    var replicate = that._hyperlog.replicate()
-    pump(stream, replicate, stream)
+  // the status of this EventStore
+  this.status = new EventEmitter()
+
+  this._server = net.createServer(function handle (stream) {
+    that.emit('clientConnected')
+
+    var id = that._lastClient++
+    var replicate = that._hyperlog.replicate({ live: true })
+    var result = pump(stream, replicate, stream, function (err) {
+      if (err) { return that.emit('clientError', err) }
+      delete that._clients[id]
+    })
+
+    that._clients[id] = result
   })
 }
 
 inherits(EventStore, EventEmitter)
 
-function genWriters(that, messages) {
-  Object.keys(messages).map(function(key) {
+function genWriters (that, messages) {
+  Object.keys(messages).map(function (key) {
     return messages[key]
   }).reduce(genWriter, that)
 }
 
 function genWriter (that, msg) {
   if (msg.encode) {
-    that['put' + msg.name] = function writer(data, cb) {
+    that['put' + msg.name] = function writer (data, cb) {
       this.putEvent({
         name: msg.name,
         payload: msg.encode(data)
@@ -94,15 +111,18 @@ EventStore.prototype.putEvent = function (data, cb) {
 }
 
 EventStore.prototype.getId = function (cb) {
-  if (this.id) { return cb(null, id) }
+  if (this.id) { return cb(null, this.id) }
 
   var that = this
   var db = this._db
 
-  db.get(STOREID, function(err, value) {
+  db.get(STOREID, function (err, value) {
+    if (err && !err.notFound) { return cb(err) }
     that.id = value || cuid()
-    db.put(STOREID, that.id, function(err) {
-      if (err) { return cb(err) }
+    db.put(STOREID, that.id, function (err) {
+      if (err) {
+        return cb(err)
+      }
       cb(null, that.id)
     })
   })
@@ -112,9 +132,11 @@ EventStore.prototype.connect = function (port, host, cb) {
   var stream = net.connect(port, host)
   var that = this
 
-  stream.on('connect', function() {
-    var replicate = that._hyperlog.replicate()
-    pump(stream, replicate, stream)
+  this._clients[host + ':' + port] = stream
+
+  stream.on('connect', function () {
+    var replicate = that._hyperlog.replicate({ live: true })
+    pump(replicate, stream, replicate)
 
     if (cb) {
       stream.removeListener('error', cb)
@@ -150,10 +172,14 @@ EventStore.prototype.listen = function (port, address, cb) {
   this._listening = true
 
   this.getId(function (err, id) {
-    if (err) { return cb(err) }
+    if (err) {
+      return cb(err)
+    }
 
     that._server.listen(port, address, function (err) {
-      if (err) { return cb(err) }
+      if (err) {
+        return cb(err)
+      }
 
       var addresses = address ? [address] : localIps()
 
@@ -167,7 +193,7 @@ EventStore.prototype.listen = function (port, address, cb) {
       that.putEvent({
         name: 'EventPeer',
         payload: headers.EventPeer.encode({
-          id: that.id,
+          id: id,
           addresses: addresses
         })
       }, cb)
@@ -176,20 +202,28 @@ EventStore.prototype.listen = function (port, address, cb) {
 }
 
 EventStore.prototype.close = function (cb) {
-  var count = this._listening? 2 : 1
+  var that = this
+
   this._changes.destroy()
-  this._db.close(release)
 
-  if (this._listening) {
-    this._server.close(release)
+  var toClose = [that._db]
+  if (that._listening) {
+    toClose.push(that._server)
   }
 
-  function release(err) {
-    if (err) { return cb(err) }
+  Object.keys(this._clients).forEach(function (key) {
+    toClose.unshift(that._clients[key])
+  })
+  that._parallel(that, doClose, toClose, cb)
+}
 
-    if (--count === 0) { return cb() }
+function doClose (stuff, cb) {
+  if (stuff.close) {
+    stuff.close(cb)
+  } else {
+    stuff.destroy()
+    setImmediate(cb)
   }
-
 }
 
 module.exports = EventStore
