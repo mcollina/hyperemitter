@@ -35,27 +35,18 @@ function EventStore (db, schema, opts) {
     that._last = that._last.concat(heads)
   })
 
+  Object.keys(headers).forEach(function (header) {
+    that.messages[header] = headers[header]
+  })
+
   // TODO restore only from a given point
   this._changes =
     pump(
       this._hyperlog.createReadStream({ live: true }),
       through2.obj(function process (change, enc, next) {
         var header = headers.Event.decode(change.value)
-        var event
-
-        switch (header.name) {
-          case 'EventPeer':
-            event = headers[header.name].decode(header.payload)
-            if (event.id !== that.id) {
-              that.connect(event.addresses[0].port, event.addresses[0].ip, next)
-            } else {
-              next()
-            }
-            break
-          default:
-            event = that.messages[header.name].decode(header.payload)
-            that._parallel(that, that._listeners[header.name] || [], event, next)
-        }
+        var event = that.messages[header.name].decode(header.payload)
+        that._parallel(that, that._listeners[header.name] || [], event, next)
       })
   )
 
@@ -73,6 +64,14 @@ function EventStore (db, schema, opts) {
     })
 
     that._clients[id] = result
+  })
+
+  this.on('EventPeer', function (peer, cb) {
+    if (peer.id !== peer.id) {
+      that.connect(peer.addresses[0].port, peer.addresses[0].ip, cb)
+    } else {
+      cb()
+    }
   })
 }
 
