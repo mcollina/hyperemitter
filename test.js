@@ -7,7 +7,7 @@ var path = require('path')
 var basicProto = fs.readFileSync(path.join(__dirname, 'fixture', 'basic.proto'))
 
 test('standalone works', function (t) {
-  t.plan(5)
+  t.plan(7)
 
   var store = new EventStore(levelup({
     db: memdown
@@ -25,12 +25,17 @@ test('standalone works', function (t) {
 
   var count = 2
 
-  store.putTest1(test1, function (err) {
+  store.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store.putTest2(test2, function (err) {
+  store.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
+  })
+
+  store.emit('abcde', {}, function (err) {
+    t.ok(err, 'errors')
+    t.equal(err.message, 'Non supported event')
   })
 
   store.on('Test1', function (msg) {
@@ -38,8 +43,11 @@ test('standalone works', function (t) {
     release()
   })
 
-  store.on('Test2', function (msg) {
+  store.on('Test2', function (msg, cb) {
     t.deepEqual(msg, test2, 'Test2 event matches')
+
+    // second argument can be a function, backpressure is supported
+    cb()
     release()
   })
 
@@ -91,11 +99,11 @@ test('paired works', function (t) {
     release()
   })
 
-  store1.putTest1(test1, function (err) {
+  store1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store2.putTest2(test2, function (err) {
+  store2.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
   })
 
@@ -105,5 +113,30 @@ test('paired works', function (t) {
         store2.close(t.pass.bind(t, 'closed successfully'))
       })
     }
+  }
+})
+
+test('remove listeners', function (t) {
+  t.plan(2)
+
+  var store = new EventStore(levelup({
+    db: memdown
+  }), basicProto)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  store.on('Test1', onEvent)
+  store.removeListener('Test1', onEvent)
+
+  store.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+    store.close(t.pass.bind(t, 'closed successfully'))
+  })
+
+  function onEvent (msg, cb) {
+    t.fail('this should never be called')
   }
 })

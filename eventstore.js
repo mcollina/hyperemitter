@@ -1,4 +1,3 @@
-var inherits = require('util').inherits
 var EventEmitter = require('events').EventEmitter
 var fs = require('fs')
 var path = require('path')
@@ -10,6 +9,7 @@ var cuid = require('cuid')
 var os = require('os')
 var pump = require('pump')
 var fastparallel = require('fastparallel')
+var through2 = require('through2')
 var STOREID = '!!STOREID!!'
 
 function EventStore (db, schema, opts) {
@@ -26,8 +26,7 @@ function EventStore (db, schema, opts) {
   this._parallel = fastparallel()
   this._clients = {}
   this._lastClient = 0
-
-  genWriters(this, this._messages)
+  this._listeners = {}
 
   var that = this
   this._hyperlog.heads(function (err, heads) {
@@ -37,35 +36,39 @@ function EventStore (db, schema, opts) {
   })
 
   // TODO restore only from a given point
-  this._changes = this._hyperlog.createReadStream({ live: true })
+  this._changes =
+    pump(
+      this._hyperlog.createReadStream({ live: true }),
+      through2.obj(function process (change, enc, next) {
+        var header = headers.Event.decode(change.value)
+        var event
 
-  this._changes.on('data', function process (change) {
-    var header = headers.Event.decode(change.value)
-    var event
-
-    switch (header.name) {
-      case 'EventPeer':
-        event = headers[header.name].decode(header.payload)
-        if (event.id !== that.id) {
-          that.connect(event.addresses[0].port, event.addresses[0].ip)
+        switch (header.name) {
+          case 'EventPeer':
+            event = headers[header.name].decode(header.payload)
+            if (event.id !== that.id) {
+              that.connect(event.addresses[0].port, event.addresses[0].ip, next)
+            } else {
+              next()
+            }
+            break
+          default:
+            event = that._messages[header.name].decode(header.payload)
+            that._parallel(that, that._listeners[header.name] || [], event, next)
         }
-        break
-      default:
-        event = that._messages[header.name].decode(header.payload)
-        that.emit(header.name, event)
-    }
-  })
+      })
+  )
 
   // the status of this EventStore
   this.status = new EventEmitter()
 
   this._server = net.createServer(function handle (stream) {
-    that.emit('clientConnected')
+    that.status.emit('clientConnected')
 
     var id = that._lastClient++
     var replicate = that._hyperlog.replicate({ live: true })
     var result = pump(stream, replicate, stream, function (err) {
-      if (err) { return that.emit('clientError', err) }
+      if (err) { return that.status.emit('clientError', err) }
       delete that._clients[id]
     })
 
@@ -73,31 +76,20 @@ function EventStore (db, schema, opts) {
   })
 }
 
-inherits(EventStore, EventEmitter)
+EventStore.prototype.emit = function (name, data, cb) {
+  var encoder = headers[name] || this._messages[name]
+  var err
 
-function genWriters (that, messages) {
-  Object.keys(messages).map(function (key) {
-    return messages[key]
-  }).reduce(genWriter, that)
-}
-
-function genWriter (that, msg) {
-  if (msg.encode) {
-    that['put' + msg.name] = function writer (data, cb) {
-      this.putEvent({
-        name: msg.name,
-        payload: msg.encode(data)
-      }, cb)
-    }
-  } else {
-    genWriters(that, msg)
+  if (!encoder) {
+    err = new Error('Non supported event')
+    if (cb) { return cb(err) }
+    else throw err
   }
 
-  return that
-}
-
-EventStore.prototype.putEvent = function (data, cb) {
-  var header = headers.Event.encode(data)
+  var header = headers.Event.encode({
+    name: name,
+    payload: encoder.encode(data)
+  })
   var that = this
 
   this._hyperlog.add(this._last, header, function (err, node) {
@@ -108,6 +100,31 @@ EventStore.prototype.putEvent = function (data, cb) {
   })
 
   this._last = []
+  return this
+}
+
+EventStore.prototype.on = function (name, callback) {
+  var toInsert = callback
+  this._listeners[name] = this._listeners[name] || []
+  if (toInsert.length < 2) {
+    toInsert = function (msg, cb) {
+      callback(msg)
+      cb()
+    }
+
+    callback.wrapped = toInsert
+  }
+  this._listeners[name].push(toInsert)
+  return this
+}
+
+EventStore.prototype.removeListener = function (name, func) {
+  if (func.wrapped) {
+    func = func.wrapped
+  }
+
+  this._listeners[name].splice(this._listeners[name].indexOf(func), 1)
+  return this
 }
 
 EventStore.prototype.getId = function (cb) {
@@ -190,12 +207,9 @@ EventStore.prototype.listen = function (port, address, cb) {
         }
       })
 
-      that.putEvent({
-        name: 'EventPeer',
-        payload: headers.EventPeer.encode({
-          id: id,
-          addresses: addresses
-        })
+      that.emit('EventPeer', {
+        id: id,
+        addresses: addresses
       }, cb)
     })
   })
