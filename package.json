@@ -22,8 +22,6 @@
   "license": "MIT",
   "devDependencies": {
     "faucet": "0.0.1",
-    "level-test": "^1.7.0",
-    "memdown": "^1.0.0",
     "pre-commit": "^1.0.6",
     "standard": "^3.7.1",
     "tape": "^4.0.0"
@@ -32,7 +30,7 @@
     "cuid": "^1.2.4",
     "fastparallel": "^1.5.0",
     "hyperlog": "^3.3.1",
-    "levelup": "^0.19.0",
+    "memdb": "^0.2.0",
     "mutexify": "^1.0.1",
     "protocol-buffers": "^3.0.0",
     "pump": "^1.0.0",
