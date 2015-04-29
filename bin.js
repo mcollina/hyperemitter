@@ -70,20 +70,18 @@ function startREPL (err) {
   Object.keys(store.messages).map(function (key) {
     return store.messages[key]
   }).forEach(function (message) {
-    store.on(message.name, print)
+    store.on(message.name, function (msg) {
+      instance.inputStream.write('\n')
+      console.log(message.name, msg)
+
+      // undocumented function in node and io
+      instance.displayPrompt()
+    })
   })
 
   instance.on('exit', function () {
     process.exit(0)
   })
-
-  function print (msg) {
-    instance.inputStream.write('\n')
-    console.log(msg)
-
-    // undocumented function in node and io
-    instance.displayPrompt()
-  }
 }
 
 function noOutputEval (cmd, context, filename, callback) {

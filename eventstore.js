@@ -43,12 +43,14 @@ function EventStore (db, schema, opts) {
   this._changes =
     pump(
       this._hyperlog.createReadStream({ live: true }),
-      through2.obj(function process (change, enc, next) {
-        var header = headers.Event.decode(change.value)
-        var event = that.messages[header.name].decode(header.payload)
-        that._parallel(that, that._listeners[header.name] || [], event, next)
-      })
-  )
+      through2.obj(process)
+    )
+
+  function process (change, enc, next) {
+    var header = headers.Event.decode(change.value)
+    var event = that.messages[header.name].decode(header.payload)
+    that._parallel(that, that._listeners[header.name] || [], event, next)
+  }
 
   // the status of this EventStore
   this.status = new EventEmitter()
