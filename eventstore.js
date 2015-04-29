@@ -17,7 +17,7 @@ function EventStore (db, schema, opts) {
     return new EventStore(db, schema, opts)
   }
 
-  this._messages = protobuf(schema)
+  this.messages = protobuf(schema)
   this._db = db
   this._hyperlog = hyperlog(db)
   this._last = []
@@ -53,7 +53,7 @@ function EventStore (db, schema, opts) {
             }
             break
           default:
-            event = that._messages[header.name].decode(header.payload)
+            event = that.messages[header.name].decode(header.payload)
             that._parallel(that, that._listeners[header.name] || [], event, next)
         }
       })
@@ -77,7 +77,7 @@ function EventStore (db, schema, opts) {
 }
 
 EventStore.prototype.emit = function (name, data, cb) {
-  var encoder = headers[name] || this._messages[name]
+  var encoder = headers[name] || this.messages[name]
   var err
 
   if (!encoder) {
@@ -96,7 +96,9 @@ EventStore.prototype.emit = function (name, data, cb) {
     if (err) { return cb(err) }
 
     that._last.push(node.key)
-    cb()
+    if (cb) {
+      cb()
+    }
   })
 
   this._last = []
@@ -208,14 +210,17 @@ EventStore.prototype.listen = function (port, address, cb) {
       addresses = addresses.map(function (ip) {
         return {
           ip: ip.address,
-          port: port
+          port: that._server.address().port
         }
       })
 
       that.emit('EventPeer', {
         id: id,
         addresses: addresses
-      }, cb)
+      }, function (err) {
+        if (err) { return cb(err) }
+        cb(null, that._server.address())
+      })
     })
   })
 }

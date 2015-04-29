@@ -1,0 +1,8 @@
+message Hello {
+  optional string from = 1;
+  optional string message = 2;
+}
+
+message Integer {
+  optional int32 value = 1;
+}

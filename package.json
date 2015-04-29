@@ -7,6 +7,9 @@
     "test": "tape test.js | faucet",
     "lint": "standard"
   },
+  "bin": {
+    "pes-client": "./bin.js"
+  },
   "pre-commit": [
     "lint",
     "test"
@@ -19,9 +22,10 @@
     "dag"
   ],
   "author": "Matteo Collina <hello@matteocollina.com>",
-  "license": "MIT",
+  "license": "ISC",
   "devDependencies": {
     "faucet": "0.0.1",
+    "minimist": "^1.1.1",
     "pre-commit": "^1.0.6",
     "standard": "^3.7.1",
     "tape": "^4.0.0"
