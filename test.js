@@ -116,6 +116,78 @@ test('paired works', function (t) {
   }
 })
 
+test('three way works', function (t) {
+  t.plan(9)
+
+  var store1 = new EventStore(levelup({
+    db: memdown
+  }), basicProto)
+
+  var store2 = new EventStore(levelup({
+    db: memdown
+  }), basicProto)
+
+  var store3 = new EventStore(levelup({
+    db: memdown
+  }), basicProto)
+
+  store1.listen(9901, '127.0.0.1', function (err) {
+    t.error(err, 'no error')
+
+    store2.connect(9901, '127.0.0.1', function (err) {
+      t.error(err, 'no error')
+
+      store2.listen(9902, '127.0.0.1', function (err) {
+        t.error(err, 'no error')
+
+        store3.connect(9902, '127.0.0.1', function (err) {
+          t.error(err, 'no error')
+        })
+      })
+    })
+  })
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  var count = 2
+
+  store3.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+    release()
+  })
+
+  store3.on('Test2', function (msg) {
+    t.deepEqual(msg, test2, 'Test2 event matches')
+    release()
+  })
+
+  store1.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  store1.emit('Test2', test2, function (err) {
+    t.error(err, 'no error')
+  })
+
+  function release () {
+    if (--count === 0) {
+      store1.close(function () {
+        store2.close(function () {
+          store3.close(t.pass.bind(t, 'closed successfully'))
+        })
+      })
+    }
+  }
+})
+
 test('remove listeners', function (t) {
   t.plan(2)
 

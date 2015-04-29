@@ -148,8 +148,13 @@ EventStore.prototype.getId = function (cb) {
 EventStore.prototype.connect = function (port, host, cb) {
   var stream = net.connect(port, host)
   var that = this
+  var key = host + ':' + port
 
-  this._clients[host + ':' + port] = stream
+  if (this._clients[key]) {
+    return cb ? cb() : this
+  }
+
+  this._clients[key] = stream
 
   stream.on('connect', function () {
     var replicate = that._hyperlog.replicate({ live: true })
@@ -198,7 +203,7 @@ EventStore.prototype.listen = function (port, address, cb) {
         return cb(err)
       }
 
-      var addresses = address ? [address] : localIps()
+      var addresses = address ? [{ address: address }] : localIps()
 
       addresses = addresses.map(function (ip) {
         return {
