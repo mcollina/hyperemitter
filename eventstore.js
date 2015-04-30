@@ -12,6 +12,7 @@ var fastparallel = require('fastparallel')
 var eos = require('end-of-stream')
 var through2 = require('through2')
 var xtend = require('xtend')
+var duplexify = require('duplexify')
 var STOREID = '!!STOREID!!'
 var PEERS = '!!PEERS!!'
 var defaults = {
@@ -275,6 +276,33 @@ EventStore.prototype.listen = function (port, address, cb) {
       })
     })
   })
+}
+
+EventStore.prototype.stream = function (cb) {
+  var that = this
+  var result = duplexify.obj()
+  var input = through2.obj(function (chunk, enc, next) {
+    that.emit(chunk.name, chunk.payload, next)
+  })
+
+  result.setWritable(input)
+
+  that._hyperlog.ready(function () {
+    var filter = through2.obj(function (change, enc, next) {
+      var header = headers.Event.decode(change.value)
+      var event = that.messages[header.name].decode(header.payload)
+      this.push({
+        name: header.name,
+        payload: event
+      })
+      next()
+    })
+
+    pump(that._hyperlog.createReadStream({ live: true }), filter)
+    result.setReadable(filter)
+  })
+
+  return result
 }
 
 EventStore.prototype.close = function (cb) {

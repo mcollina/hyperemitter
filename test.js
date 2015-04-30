@@ -410,3 +410,62 @@ test('do not re-emit old events', function (t) {
     })
   })
 })
+
+test('as stream', function (t) {
+  t.plan(6)
+
+  var store = new EventStore(memdb(), basicProto)
+  var stream = store.stream()
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  var count = 2
+
+  store.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+
+    stream.end({
+      name: 'Test2',
+      payload: test2
+    }, function (err) {
+      t.error(err, 'no error')
+    })
+  })
+
+  stream.once('data', function (msg) {
+    t.deepEqual(msg, {
+      name: 'Test1',
+      payload: test1
+    }, 'Test1 event matches')
+
+    stream.once('data', function (msg) {
+      t.deepEqual(msg, {
+        name: 'Test2',
+        payload: test2
+      }, 'Test2 event matches')
+    })
+    release()
+  })
+
+  store.on('Test2', function (msg, cb) {
+    t.deepEqual(msg, test2, 'Test2 event matches')
+
+    // second argument can be a function, backpressure is supported
+    cb()
+    release()
+  })
+
+  function release () {
+    if (--count === 0) {
+      store.close(t.pass.bind(t, 'closed successfully'))
+    }
+  }
+})
