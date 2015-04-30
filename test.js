@@ -469,3 +469,39 @@ test('as stream', function (t) {
     }
   }
 })
+
+test('no eventpeer if it is not needed', function (t) {
+  t.plan(3)
+
+  var db = memdb()
+
+  var store = new EventStore(db, basicProto)
+
+  store.listen(9901, function (err) {
+    t.error(err, 'no error')
+
+    var oldClose = db.close
+    db.close = function (cb) {
+      return cb()
+    }
+
+    store.close(function () {
+      db.close = oldClose
+      store = new EventStore(db, basicProto)
+
+      store.on('EventPeer', function (msg) {
+        t.fail('EventPeer should never be emitted')
+      })
+
+      store.listen(9901, function (err) {
+        t.error(err, 'no error')
+
+        // wait some time for the event to be published
+        setTimeout(function () {
+          store.close(t.pass.bind(t, 'closed successfully'))
+        }, 50)
+      })
+    })
+  })
+
+})

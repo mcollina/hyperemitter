@@ -13,8 +13,10 @@ var eos = require('end-of-stream')
 var through2 = require('through2')
 var xtend = require('xtend')
 var duplexify = require('duplexify')
+var deepEqual = require('deep-equal')
 var STOREID = '!!STOREID!!'
 var PEERS = '!!PEERS!!'
+var MYEVENTPEER = '!!MYEVENTPEER!!'
 var defaults = {
   reconnectTimeout: 1000
 }
@@ -27,7 +29,7 @@ function EventStore (db, schema, opts) {
   this.messages = protobuf(schema)
   this._db = db
   this._hyperlog = hyperlog(db)
-  this._last = []
+  this._last = null
   this._opts = xtend(defaults, opts)
   this._listening = false
   this._parallel = fastparallel()
@@ -40,7 +42,7 @@ function EventStore (db, schema, opts) {
   this._hyperlog.heads(function (err, heads) {
     if (err) { return that.status.emit('error', err) }
 
-    that._last = that._last.concat(heads)
+    that._last = heads
   })
 
   Object.keys(headers).forEach(function (header) {
@@ -62,6 +64,7 @@ function EventStore (db, schema, opts) {
   })
 
   function process (change, enc, next) {
+    that._last = change.key
     var header = headers.Event.decode(change.value)
     var event = that.messages[header.name].decode(header.payload)
     that._parallel(that, that._listeners[header.name] || [], event, next)
@@ -123,18 +126,9 @@ EventStore.prototype.emit = function (name, data, cb) {
     name: name,
     payload: encoder.encode(data)
   })
-  var that = this
 
-  this._hyperlog.add(this._last, header, function (err, node) {
-    if (err) { return cb(err) }
+  this._hyperlog.add(this._last, header, cb)
 
-    that._last.push(node.key)
-    if (cb) {
-      cb()
-    }
-  })
-
-  this._last = []
   return this
 }
 
@@ -267,12 +261,29 @@ EventStore.prototype.listen = function (port, address, cb) {
         }
       })
 
-      that.emit('EventPeer', {
+      var toStore = {
         id: id,
         addresses: addresses
-      }, function (err) {
-        if (err) { return cb(err) }
-        cb(null, that._server.address())
+      }
+
+      that._db.get(MYEVENTPEER, { valueEncoding: 'json' }, function (err, value) {
+        if (err && !err.notFound) {
+          return cb(err)
+        }
+
+        if (deepEqual(value, toStore)) {
+          return cb()
+        }
+
+        that.emit('EventPeer', toStore, function (err) {
+          if (err) { return cb(err) }
+
+          that._db.put(MYEVENTPEER, JSON.stringify(toStore), function (err) {
+            if (err) { return cb(err) }
+
+            cb(null, that._server.address())
+          })
+        })
       })
     })
   })

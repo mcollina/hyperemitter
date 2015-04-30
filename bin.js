@@ -150,7 +150,6 @@ function startStream () {
   )
 
   // output pipeline
-
   pump(
     stream,
     ndjson.serialize(),
