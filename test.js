@@ -370,3 +370,43 @@ test('automatically reconnects', function (t) {
     })
   })
 })
+
+test('do not re-emit old events', function (t) {
+  t.plan(3)
+
+  var db = memdb()
+  var store = new EventStore(db, basicProto)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  store.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  var oldClose = db.close
+  db.close = function (cb) {
+    return cb()
+  }
+
+  store.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+
+    store.close(function () {
+      db.close = oldClose
+      store = new EventStore(db, basicProto)
+
+      store.on('Test1', function () {
+        t.fail('this should not happen')
+      })
+
+      // timeout needed to wait for the Test1 event to
+      // be eventually emitted
+      setTimeout(function () {
+        store.close(t.pass.bind(t, 'closed successfully'))
+      }, 100)
+    })
+  })
+})

@@ -37,7 +37,7 @@ function EventStore (db, schema, opts) {
 
   var that = this
   this._hyperlog.heads(function (err, heads) {
-    if (err) { return that.emit('error', err) }
+    if (err) { return that.status.emit('error', err) }
 
     that._last = that._last.concat(heads)
   })
@@ -46,12 +46,19 @@ function EventStore (db, schema, opts) {
     that.messages[header] = headers[header]
   })
 
-  // TODO restore only from a given point
-  this._changes =
-    pump(
-      this._hyperlog.createReadStream({ live: true }),
-      through2.obj(process)
-    )
+  this._hyperlog.ready(function () {
+    if (that._closed) {
+      return
+    }
+
+    that.status.emit('ready')
+
+    that._changes =
+      pump(
+        that._hyperlog.createReadStream({ since: that._hyperlog.changes, live: true }),
+        through2.obj(process)
+      )
+  })
 
   function process (change, enc, next) {
     var header = headers.Event.decode(change.value)
@@ -273,7 +280,9 @@ EventStore.prototype.listen = function (port, address, cb) {
 EventStore.prototype.close = function (cb) {
   var that = this
 
-  this._changes.destroy()
+  if (this._changes) {
+    this._changes.destroy()
+  }
 
   var toClose = [that._db]
   if (that._listening) {
