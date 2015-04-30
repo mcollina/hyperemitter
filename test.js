@@ -259,3 +259,61 @@ test('offline peer sync', function (t) {
     })
   })
 })
+
+test('offline reconnect', function (t) {
+  t.plan(7)
+
+  var store1 = new EventStore(memdb(), basicProto)
+
+  var store2db = memdb()
+
+  var store2 = new EventStore(store2db, basicProto)
+
+  store1.listen(9901, function (err) {
+    t.error(err, 'no error')
+
+    store2.connect(9901, '127.0.0.1', function (err) {
+      t.error(err, 'no error')
+    })
+  })
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  store1.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  var oldClose = store2db.close
+  store2db.close = function (cb) {
+    return cb()
+  }
+
+  store2.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+
+    store2.close(function () {
+      store2db.close = oldClose
+      store2 = new EventStore(store2db, basicProto)
+
+      store1.emit('Test2', test2, function (err) {
+        t.error(err, 'no error')
+      })
+
+      store2.on('Test2', function (msg) {
+        t.deepEqual(msg, test2, 'Test2 event matches')
+
+        store1.close(function () {
+          store2.close(t.pass.bind(t, 'closed successfully'))
+        })
+      })
+    })
+  })
+})

@@ -11,6 +11,7 @@ var pump = require('pump')
 var fastparallel = require('fastparallel')
 var through2 = require('through2')
 var STOREID = '!!STOREID!!'
+var PEERS = '!!PEERS!!'
 
 function EventStore (db, schema, opts) {
   if (!(this instanceof EventStore)) {
@@ -74,6 +75,24 @@ function EventStore (db, schema, opts) {
     } else {
       cb()
     }
+  })
+
+  this._db.get(PEERS, function (err, value) {
+    if (err && !err.notFound) {
+      return that.status.emit('error', err)
+    }
+
+    if (err && err.notFound) {
+      // nothing to do
+      return
+    }
+
+    value = JSON.parse(value)
+
+    that._parallel(that, function (peer, cb) {
+      console.log('reconnecting', peer)
+      that.connect(peer.port, peer.address, cb)
+    }, value, function () {})
   })
 }
 
@@ -163,10 +182,17 @@ EventStore.prototype.connect = function (port, host, cb) {
     var replicate = that._hyperlog.replicate({ live: true })
     pump(replicate, stream, replicate)
 
-    if (cb) {
-      stream.removeListener('error', cb)
-      cb()
-    }
+    var peers = Object.keys(that._clients).map(function (key) {
+      var split = key.split(':')
+      return { address: split[0], port: split[1] }
+    })
+
+    that._db.put(PEERS, JSON.stringify(peers), function (err) {
+      if (cb) {
+        stream.removeListener('error', cb)
+        cb(err) // what to do if cb is not specified?
+      }
+    })
   })
 
   if (cb) {
