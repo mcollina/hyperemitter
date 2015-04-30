@@ -1,13 +1,16 @@
 #! /usr/bin/env node
 
-var memdb = require('memdb')()
+var memdb = require('memdb')
+var pump = require('pump')
+var level = require('level')
 var fs = require('fs')
 var vm = require('vm')
 var minimist = require('minimist')
 var repl = require('repl')
+var ndjson = require('ndjson')
 var argv = minimist(process.argv.splice(2), {
-  string: ['host', 'port', 'targetHost'],
-  boolean: ['help'],
+  string: ['host', 'port', 'targetHost', 'db'],
+  boolean: ['help', 'repl'],
   alias: {
     'targetHost': 'target-host',
     'targetPort': 'target-port',
@@ -16,13 +19,14 @@ var argv = minimist(process.argv.splice(2), {
   default: {
     host: 'localhost',
     targetHost: 'localhost',
-    port: 0
+    repl: true
   }
 })
 
 function usage () {
   console.log('Usage: pes-client SCHEMA [--port PORT] [--host HOST]\n' +
-              '                  [--target-host HOST] [--target-port PORT]')
+              '                  [--target-host HOST] [--target-port PORT]\n' +
+              '                  [--db PATH] [--no-repl]')
 }
 
 if (argv.help) {
@@ -38,20 +42,43 @@ if (!argv._[0]) {
 }
 
 var messages = fs.readFileSync(argv._[0])
-var store = require('./')(memdb, messages)
+var db = argv.db ? level(argv.db) : memdb()
+var store = require('./')(db, messages)
+var start = argv.repl ? startREPL : startStream
 
-store.listen(argv.port, argv.host, function (err, bound) {
-  if (err) {
-    throw err
-  }
-  console.log('listening on', bound.port, bound.address)
+if (argv.port) {
+  store.listen(argv.port, argv.host, function (err, bound) {
+    if (err) {
+      throw err
+    }
 
+    if (argv.repl) {
+      console.log('listening on', bound.port, bound.address)
+    }
+
+    connect(start)
+  })
+} else {
+  connect(start)
+}
+
+function connect (next) {
   if (argv.targetHost && argv.targetPort) {
-    store.connect(argv.targetPort, argv.targetHost, startREPL)
+    store.connect(argv.targetPort, argv.targetHost, function (err) {
+      if (err) {
+        throw err
+      }
+
+      if (argv.repl) {
+        console.log('connected to', argv.targetHost, argv.targetPort)
+      }
+
+      next()
+    })
   } else {
-    startREPL()
+    next()
   }
-})
+}
 
 function startREPL (err) {
   if (err) {
@@ -110,4 +137,23 @@ function noOutputEval (cmd, context, filename, callback) {
   }
 
   callback(err, undefined)
+}
+
+function startStream () {
+  var stream = store.stream()
+
+  // input pipeline
+  pump(
+    process.stdin,
+    ndjson.parse(),
+    stream
+  )
+
+  // output pipeline
+
+  pump(
+    stream,
+    ndjson.serialize(),
+    process.stdout
+  )
 }
