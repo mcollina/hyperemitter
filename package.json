@@ -32,12 +32,14 @@
   },
   "dependencies": {
     "cuid": "^1.2.4",
+    "end-of-stream": "^1.1.0",
     "fastparallel": "^1.5.0",
     "hyperlog": "^3.3.1",
     "memdb": "^0.2.0",
     "mutexify": "^1.0.1",
     "protocol-buffers": "^3.0.0",
     "pump": "^1.0.0",
-    "through2": "^0.6.5"
+    "through2": "^0.6.5",
+    "xtend": "^4.0.0"
   }
 }

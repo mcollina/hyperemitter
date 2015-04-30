@@ -9,9 +9,14 @@ var cuid = require('cuid')
 var os = require('os')
 var pump = require('pump')
 var fastparallel = require('fastparallel')
+var eos = require('end-of-stream')
 var through2 = require('through2')
+var xtend = require('xtend')
 var STOREID = '!!STOREID!!'
 var PEERS = '!!PEERS!!'
+var defaults = {
+  reconnectTimeout: 1000
+}
 
 function EventStore (db, schema, opts) {
   if (!(this instanceof EventStore)) {
@@ -22,12 +27,13 @@ function EventStore (db, schema, opts) {
   this._db = db
   this._hyperlog = hyperlog(db)
   this._last = []
-  this._opts = opts || {}
+  this._opts = xtend(defaults, opts)
   this._listening = false
   this._parallel = fastparallel()
   this._clients = {}
   this._lastClient = 0
   this._listeners = {}
+  this._closed = false
 
   var that = this
   this._hyperlog.heads(function (err, heads) {
@@ -90,7 +96,6 @@ function EventStore (db, schema, opts) {
     value = JSON.parse(value)
 
     that._parallel(that, function (peer, cb) {
-      console.log('reconnecting', peer)
       that.connect(peer.port, peer.address, cb)
     }, value, function () {})
   })
@@ -167,16 +172,15 @@ EventStore.prototype.getId = function (cb) {
   })
 }
 
-EventStore.prototype.connect = function (port, host, cb) {
+function _connect (that, port, host, tries, cb) {
   var stream = net.connect(port, host)
-  var that = this
   var key = host + ':' + port
 
-  if (this._clients[key]) {
-    return cb ? cb() : this
+  if (that._clients[key]) {
+    return cb ? cb() : undefined
   }
 
-  this._clients[key] = stream
+  that._clients[key] = stream
 
   stream.on('connect', function () {
     var replicate = that._hyperlog.replicate({ live: true })
@@ -189,15 +193,29 @@ EventStore.prototype.connect = function (port, host, cb) {
 
     that._db.put(PEERS, JSON.stringify(peers), function (err) {
       if (cb) {
-        stream.removeListener('error', cb)
         cb(err) // what to do if cb is not specified?
+        cb = null
       }
     })
   })
 
-  if (cb) {
-    stream.on('error', cb)
-  }
+  eos(stream, function (err) {
+    delete that._clients[key]
+    if (err) {
+      that.status.emit('connectionError', err, stream)
+      if (!that._closed && tries < 10) {
+        setTimeout(function () {
+          _connect(that, port, host, cb)
+        }, that._opts.reconnectTimeout)
+      } else {
+        return cb ? cb(err) : undefined
+      }
+    }
+  })
+}
+
+EventStore.prototype.connect = function (port, host, cb) {
+  _connect(this, port, host, 1, cb)
 }
 
 function localIps () {
@@ -261,6 +279,7 @@ EventStore.prototype.close = function (cb) {
   if (that._listening) {
     toClose.push(that._server)
   }
+  this._closed = true
 
   Object.keys(this._clients).forEach(function (key) {
     toClose.unshift(that._clients[key])

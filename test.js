@@ -317,3 +317,56 @@ test('offline reconnect', function (t) {
     })
   })
 })
+
+test('automatically reconnects', function (t) {
+  t.plan(7)
+
+  var store1 = new EventStore(memdb(), basicProto)
+
+  var store2 = new EventStore(memdb(), basicProto, {
+    reconnectTimeout: 10
+  })
+
+  store1.listen(9901, function (err) {
+    t.error(err, 'no error')
+
+    store2.connect(9901, '127.0.0.1', function (err) {
+      t.error(err, 'no error')
+    })
+  })
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  store1.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  store2.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+
+    // using internal data to fake a connection failure
+    store2._clients['127.0.0.1:9901'].destroy()
+
+    setImmediate(function () {
+      store1.emit('Test2', test2, function (err) {
+        t.error(err, 'no error')
+      })
+
+      store2.on('Test2', function (msg) {
+        t.deepEqual(msg, test2, 'Test2 event matches')
+
+        store1.close(function () {
+          store2.close(t.pass.bind(t, 'closed successfully'))
+        })
+      })
+    })
+  })
+})
