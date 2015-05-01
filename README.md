@@ -1,4 +1,5 @@
-# hyperemitter
+# hyperemitter &nbsp;&nbsp;[![Build Status](https://travis-ci.org/mcollina/hyperemitter.png)](https://travis-ci.org/mcollina/hyperemitter)
+
 
 Horizontally scalable __and__ persistent EventEmitter powered by a [Merkle DAG](http://npm.im/hyperlog).
 (Yes, it's like a blockchain). In other contexts, this concept is also called an EventStore.
@@ -24,6 +25,8 @@ message Hello {
   optional string message = 2;
 }
 ```
+
+[![js-standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
 
 ## Installation
 
