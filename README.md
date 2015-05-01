@@ -255,6 +255,16 @@ The known messages, as returned by
 [protocol-buffers](http://npm.im/protocol-buffers).
 
 -------------------------------------------------------
+<a name="stream"></a>
+### emitter.stream([opts])
+
+A Duplex stream to emit and receive events.
+
+`stream()` supports the following options:
+
+- `from: 'beginning'` will return all the events from the beginning.
+
+-------------------------------------------------------
 <a name="close"></a>
 ### emitter.close(callback())
 
