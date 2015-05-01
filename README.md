@@ -221,13 +221,13 @@ Emit the given message, which must be specified in the schema.
 
 -------------------------------------------------------
 <a name="on"></a>
-### emitter.on(topic, callback(message[, done]))
+### emitter.on(event, callback(message[, done]))
 
 Subscribe to the given event.
 
 -------------------------------------------------------
 <a name="removeListener"></a>
-### emitter.removeListener(topic, callback(message[, done]))
+### emitter.removeListener(event, callback(message[, done]))
 
 The inverse of `on`.
 
