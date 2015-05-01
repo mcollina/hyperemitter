@@ -14,11 +14,13 @@ var argv = minimist(process.argv.splice(2), {
   alias: {
     'targetHost': 'target-host',
     'targetPort': 'target-port',
+    'fromScratch': 'from-scratch',
     'help': 'h'
   },
   default: {
     host: 'localhost',
     targetHost: 'localhost',
+    fromScratch: false,
     repl: true
   }
 })
@@ -26,7 +28,7 @@ var argv = minimist(process.argv.splice(2), {
 function usage () {
   console.log('Usage: pes-client SCHEMA [--port PORT] [--host HOST]\n' +
               '                  [--target-host HOST] [--target-port PORT]\n' +
-              '                  [--db PATH] [--no-repl]')
+              '                  [--db PATH] [--no-repl] [--from-scratch]')
 }
 
 if (argv.help) {
@@ -43,11 +45,11 @@ if (!argv._[0]) {
 
 var messages = fs.readFileSync(argv._[0])
 var db = argv.db ? level(argv.db) : memdb()
-var store = require('./')(db, messages)
+var hyper = require('./')(db, messages)
 var start = argv.repl ? startREPL : startStream
 
 if (argv.port) {
-  store.listen(argv.port, argv.host, function (err, bound) {
+  hyper.listen(argv.port, argv.host, function (err, bound) {
     if (err) {
       throw err
     }
@@ -64,7 +66,7 @@ if (argv.port) {
 
 function connect (next) {
   if (argv.targetHost && argv.targetPort) {
-    store.connect(argv.targetPort, argv.targetHost, function (err) {
+    hyper.connect(argv.targetPort, argv.targetHost, function (err) {
       if (err) {
         throw err
       }
@@ -92,12 +94,12 @@ function startREPL (err) {
     output: process.stdout
   })
 
-  instance.context.store = store
+  instance.context.hyper = hyper
 
-  Object.keys(store.messages).map(function (key) {
-    return store.messages[key]
+  Object.keys(hyper.messages).map(function (key) {
+    return hyper.messages[key]
   }).forEach(function (message) {
-    store.on(message.name, function (msg) {
+    hyper.on(message.name, function (msg) {
       instance.inputStream.write('\n')
       console.log(message.name, msg)
 
@@ -140,7 +142,8 @@ function noOutputEval (cmd, context, filename, callback) {
 }
 
 function startStream () {
-  var stream = store.stream()
+  var opts = argv.fromScratch ? { from: 'beginning' } : null
+  var stream = hyper.stream(opts)
 
   // input pipeline
   pump(

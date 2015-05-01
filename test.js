@@ -1,5 +1,5 @@
 var test = require('tape')
-var EventStore = require('./')
+var HyperEmitter = require('./')
 var memdb = require('memdb')
 var fs = require('fs')
 var path = require('path')
@@ -8,7 +8,7 @@ var basicProto = fs.readFileSync(path.join(__dirname, 'fixture', 'basic.proto'))
 test('standalone works', function (t) {
   t.plan(7)
 
-  var store = new EventStore(memdb(), basicProto)
+  var emitter = new HyperEmitter(memdb(), basicProto)
 
   var test1 = {
     foo: 'hello',
@@ -22,25 +22,25 @@ test('standalone works', function (t) {
 
   var count = 2
 
-  store.emit('Test1', test1, function (err) {
+  emitter.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store.emit('Test2', test2, function (err) {
+  emitter.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
   })
 
-  store.emit('abcde', {}, function (err) {
+  emitter.emit('abcde', {}, function (err) {
     t.ok(err, 'errors')
     t.equal(err.message, 'Non supported event')
   })
 
-  store.on('Test1', function (msg) {
+  emitter.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
     release()
   })
 
-  store.on('Test2', function (msg, cb) {
+  emitter.on('Test2', function (msg, cb) {
     t.deepEqual(msg, test2, 'Test2 event matches')
 
     // second argument can be a function, backpressure is supported
@@ -50,7 +50,7 @@ test('standalone works', function (t) {
 
   function release () {
     if (--count === 0) {
-      store.close(t.pass.bind(t, 'closed successfully'))
+      emitter.close(t.pass.bind(t, 'closed successfully'))
     }
   }
 })
@@ -58,14 +58,14 @@ test('standalone works', function (t) {
 test('paired works', function (t) {
   t.plan(7)
 
-  var store1 = new EventStore(memdb(), basicProto)
+  var emitter1 = new HyperEmitter(memdb(), basicProto)
 
-  var store2 = new EventStore(memdb(), basicProto)
+  var emitter2 = new HyperEmitter(memdb(), basicProto)
 
-  store1.listen(9901, function (err) {
+  emitter1.listen(9901, function (err) {
     t.error(err, 'no error')
 
-    store2.connect(9901, '127.0.0.1', function (err) {
+    emitter2.connect(9901, '127.0.0.1', function (err) {
       t.error(err, 'no error')
     })
   })
@@ -82,28 +82,28 @@ test('paired works', function (t) {
 
   var count = 2
 
-  store2.on('Test1', function (msg) {
+  emitter2.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
     release()
   })
 
-  store1.on('Test2', function (msg) {
+  emitter1.on('Test2', function (msg) {
     t.deepEqual(msg, test2, 'Test2 event matches')
     release()
   })
 
-  store1.emit('Test1', test1, function (err) {
+  emitter1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store2.emit('Test2', test2, function (err) {
+  emitter2.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
   })
 
   function release () {
     if (--count === 0) {
-      store1.close(function () {
-        store2.close(t.pass.bind(t, 'closed successfully'))
+      emitter1.close(function () {
+        emitter2.close(t.pass.bind(t, 'closed successfully'))
       })
     }
   }
@@ -112,22 +112,22 @@ test('paired works', function (t) {
 test('three way works', function (t) {
   t.plan(9)
 
-  var store1 = new EventStore(memdb(), basicProto)
+  var emitter1 = new HyperEmitter(memdb(), basicProto)
 
-  var store2 = new EventStore(memdb(), basicProto)
+  var emitter2 = new HyperEmitter(memdb(), basicProto)
 
-  var store3 = new EventStore(memdb(), basicProto)
+  var emitter3 = new HyperEmitter(memdb(), basicProto)
 
-  store1.listen(9901, '127.0.0.1', function (err) {
+  emitter1.listen(9901, '127.0.0.1', function (err) {
     t.error(err, 'no error')
 
-    store2.connect(9901, '127.0.0.1', function (err) {
+    emitter2.connect(9901, '127.0.0.1', function (err) {
       t.error(err, 'no error')
 
-      store2.listen(9902, '127.0.0.1', function (err) {
+      emitter2.listen(9902, '127.0.0.1', function (err) {
         t.error(err, 'no error')
 
-        store3.connect(9902, '127.0.0.1', function (err) {
+        emitter3.connect(9902, '127.0.0.1', function (err) {
           t.error(err, 'no error')
         })
       })
@@ -146,29 +146,29 @@ test('three way works', function (t) {
 
   var count = 2
 
-  store3.on('Test1', function (msg) {
+  emitter3.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
     release()
   })
 
-  store3.on('Test2', function (msg) {
+  emitter3.on('Test2', function (msg) {
     t.deepEqual(msg, test2, 'Test2 event matches')
     release()
   })
 
-  store1.emit('Test1', test1, function (err) {
+  emitter1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store1.emit('Test2', test2, function (err) {
+  emitter1.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
   })
 
   function release () {
     if (--count === 0) {
-      store1.close(function () {
-        store2.close(function () {
-          store3.close(t.pass.bind(t, 'closed successfully'))
+      emitter1.close(function () {
+        emitter2.close(function () {
+          emitter3.close(t.pass.bind(t, 'closed successfully'))
         })
       })
     }
@@ -178,19 +178,19 @@ test('three way works', function (t) {
 test('remove listeners', function (t) {
   t.plan(2)
 
-  var store = new EventStore(memdb(), basicProto)
+  var emitter = new HyperEmitter(memdb(), basicProto)
 
   var test1 = {
     foo: 'hello',
     num: 42
   }
 
-  store.on('Test1', onEvent)
-  store.removeListener('Test1', onEvent)
+  emitter.on('Test1', onEvent)
+  emitter.removeListener('Test1', onEvent)
 
-  store.emit('Test1', test1, function (err) {
+  emitter.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
-    store.close(t.pass.bind(t, 'closed successfully'))
+    emitter.close(t.pass.bind(t, 'closed successfully'))
   })
 
   function onEvent (msg, cb) {
@@ -201,16 +201,16 @@ test('remove listeners', function (t) {
 test('offline peer sync', function (t) {
   t.plan(8)
 
-  var store1 = new EventStore(memdb(), basicProto)
+  var emitter1 = new HyperEmitter(memdb(), basicProto)
 
-  var store2db = memdb()
+  var emitter2db = memdb()
 
-  var store2 = new EventStore(store2db, basicProto)
+  var emitter2 = new HyperEmitter(emitter2db, basicProto)
 
-  store1.listen(9901, function (err) {
+  emitter1.listen(9901, function (err) {
     t.error(err, 'no error')
 
-    store2.connect(9901, '127.0.0.1', function (err) {
+    emitter2.connect(9901, '127.0.0.1', function (err) {
       t.error(err, 'no error')
     })
   })
@@ -225,35 +225,35 @@ test('offline peer sync', function (t) {
     id: 23
   }
 
-  store1.emit('Test1', test1, function (err) {
+  emitter1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  var oldClose = store2db.close
-  store2db.close = function (cb) {
+  var oldClose = emitter2db.close
+  emitter2db.close = function (cb) {
     return cb()
   }
 
-  store2.on('Test1', function (msg) {
+  emitter2.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
-    store2.close(function () {
-      store2db.close = oldClose
-      store2 = new EventStore(store2db, basicProto)
+    emitter2.close(function () {
+      emitter2db.close = oldClose
+      emitter2 = new HyperEmitter(emitter2db, basicProto)
 
-      store1.emit('Test2', test2, function (err) {
+      emitter1.emit('Test2', test2, function (err) {
         t.error(err, 'no error')
       })
 
-      store2.on('Test2', function (msg) {
+      emitter2.on('Test2', function (msg) {
         t.deepEqual(msg, test2, 'Test2 event matches')
 
-        store1.close(function () {
-          store2.close(t.pass.bind(t, 'closed successfully'))
+        emitter1.close(function () {
+          emitter2.close(t.pass.bind(t, 'closed successfully'))
         })
       })
 
-      store2.connect(9901, '127.0.0.1', function (err) {
+      emitter2.connect(9901, '127.0.0.1', function (err) {
         t.error(err, 'no error')
       })
     })
@@ -263,16 +263,16 @@ test('offline peer sync', function (t) {
 test('offline reconnect', function (t) {
   t.plan(7)
 
-  var store1 = new EventStore(memdb(), basicProto)
+  var emitter1 = new HyperEmitter(memdb(), basicProto)
 
-  var store2db = memdb()
+  var emitter2db = memdb()
 
-  var store2 = new EventStore(store2db, basicProto)
+  var emitter2 = new HyperEmitter(emitter2db, basicProto)
 
-  store1.listen(9901, function (err) {
+  emitter1.listen(9901, function (err) {
     t.error(err, 'no error')
 
-    store2.connect(9901, '127.0.0.1', function (err) {
+    emitter2.connect(9901, '127.0.0.1', function (err) {
       t.error(err, 'no error')
     })
   })
@@ -287,31 +287,31 @@ test('offline reconnect', function (t) {
     id: 23
   }
 
-  store1.emit('Test1', test1, function (err) {
+  emitter1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  var oldClose = store2db.close
-  store2db.close = function (cb) {
+  var oldClose = emitter2db.close
+  emitter2db.close = function (cb) {
     return cb()
   }
 
-  store2.on('Test1', function (msg) {
+  emitter2.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
-    store2.close(function () {
-      store2db.close = oldClose
-      store2 = new EventStore(store2db, basicProto)
+    emitter2.close(function () {
+      emitter2db.close = oldClose
+      emitter2 = new HyperEmitter(emitter2db, basicProto)
 
-      store1.emit('Test2', test2, function (err) {
+      emitter1.emit('Test2', test2, function (err) {
         t.error(err, 'no error')
       })
 
-      store2.on('Test2', function (msg) {
+      emitter2.on('Test2', function (msg) {
         t.deepEqual(msg, test2, 'Test2 event matches')
 
-        store1.close(function () {
-          store2.close(t.pass.bind(t, 'closed successfully'))
+        emitter1.close(function () {
+          emitter2.close(t.pass.bind(t, 'closed successfully'))
         })
       })
     })
@@ -321,16 +321,16 @@ test('offline reconnect', function (t) {
 test('automatically reconnects', function (t) {
   t.plan(7)
 
-  var store1 = new EventStore(memdb(), basicProto)
+  var emitter1 = new HyperEmitter(memdb(), basicProto)
 
-  var store2 = new EventStore(memdb(), basicProto, {
+  var emitter2 = new HyperEmitter(memdb(), basicProto, {
     reconnectTimeout: 10
   })
 
-  store1.listen(9901, function (err) {
+  emitter1.listen(9901, function (err) {
     t.error(err, 'no error')
 
-    store2.connect(9901, '127.0.0.1', function (err) {
+    emitter2.connect(9901, '127.0.0.1', function (err) {
       t.error(err, 'no error')
     })
   })
@@ -345,26 +345,26 @@ test('automatically reconnects', function (t) {
     id: 23
   }
 
-  store1.emit('Test1', test1, function (err) {
+  emitter1.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
-  store2.on('Test1', function (msg) {
+  emitter2.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
     // using internal data to fake a connection failure
-    store2._clients['127.0.0.1:9901'].destroy()
+    emitter2._clients['127.0.0.1:9901'].destroy()
 
     setImmediate(function () {
-      store1.emit('Test2', test2, function (err) {
+      emitter1.emit('Test2', test2, function (err) {
         t.error(err, 'no error')
       })
 
-      store2.on('Test2', function (msg) {
+      emitter2.on('Test2', function (msg) {
         t.deepEqual(msg, test2, 'Test2 event matches')
 
-        store1.close(function () {
-          store2.close(t.pass.bind(t, 'closed successfully'))
+        emitter1.close(function () {
+          emitter2.close(t.pass.bind(t, 'closed successfully'))
         })
       })
     })
@@ -375,14 +375,14 @@ test('do not re-emit old events', function (t) {
   t.plan(3)
 
   var db = memdb()
-  var store = new EventStore(db, basicProto)
+  var emitter = new HyperEmitter(db, basicProto)
 
   var test1 = {
     foo: 'hello',
     num: 42
   }
 
-  store.emit('Test1', test1, function (err) {
+  emitter.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
   })
 
@@ -391,21 +391,21 @@ test('do not re-emit old events', function (t) {
     return cb()
   }
 
-  store.on('Test1', function (msg) {
+  emitter.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
-    store.close(function () {
+    emitter.close(function () {
       db.close = oldClose
-      store = new EventStore(db, basicProto)
+      emitter = new HyperEmitter(db, basicProto)
 
-      store.on('Test1', function () {
+      emitter.on('Test1', function () {
         t.fail('this should not happen')
       })
 
       // timeout needed to wait for the Test1 event to
       // be eventually emitted
       setTimeout(function () {
-        store.close(t.pass.bind(t, 'closed successfully'))
+        emitter.close(t.pass.bind(t, 'closed successfully'))
       }, 100)
     })
   })
@@ -414,8 +414,8 @@ test('do not re-emit old events', function (t) {
 test('as stream', function (t) {
   t.plan(6)
 
-  var store = new EventStore(memdb(), basicProto)
-  var stream = store.stream()
+  var emitter = new HyperEmitter(memdb(), basicProto)
+  var stream = emitter.stream()
 
   var test1 = {
     foo: 'hello',
@@ -429,7 +429,7 @@ test('as stream', function (t) {
 
   var count = 2
 
-  store.emit('Test1', test1, function (err) {
+  emitter.emit('Test1', test1, function (err) {
     t.error(err, 'no error')
 
     stream.end({
@@ -455,7 +455,7 @@ test('as stream', function (t) {
     release()
   })
 
-  store.on('Test2', function (msg, cb) {
+  emitter.on('Test2', function (msg, cb) {
     t.deepEqual(msg, test2, 'Test2 event matches')
 
     // second argument can be a function, backpressure is supported
@@ -465,9 +465,85 @@ test('as stream', function (t) {
 
   function release () {
     if (--count === 0) {
-      store.close(t.pass.bind(t, 'closed successfully'))
+      emitter.close(t.pass.bind(t, 'closed successfully'))
     }
   }
+})
+
+test('as stream starting from a certain point', function (t) {
+  t.plan(3)
+
+  var emitter = new HyperEmitter(memdb(), basicProto)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  emitter.on('Test1', function (msg, cb) {
+    var stream = emitter.stream()
+
+    emitter.emit('Test2', test2)
+
+    stream.once('data', function (msg) {
+      t.deepEqual(msg, {
+        name: 'Test2',
+        payload: test2
+      }, 'Test2 event matches')
+
+      emitter.close(t.pass.bind(t, 'closed successfully'))
+    })
+  })
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+})
+
+test('as stream starting from the beginning', function (t) {
+  t.plan(4)
+
+  var emitter = new HyperEmitter(memdb(), basicProto)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  emitter.on('Test1', function (msg, cb) {
+    var stream = emitter.stream({ from: 'beginning' })
+
+    emitter.emit('Test2', test2)
+    stream.once('data', function (msg) {
+      t.deepEqual(msg, {
+        name: 'Test1',
+        payload: test1
+      }, 'Test1 event matches')
+
+      stream.once('data', function (msg) {
+        t.deepEqual(msg, {
+          name: 'Test2',
+          payload: test2
+        }, 'Test2 event matches')
+
+        emitter.close(t.pass.bind(t, 'closed successfully'))
+      })
+    })
+  })
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
 })
 
 test('no eventpeer if it is not needed', function (t) {
@@ -475,9 +551,9 @@ test('no eventpeer if it is not needed', function (t) {
 
   var db = memdb()
 
-  var store = new EventStore(db, basicProto)
+  var emitter = new HyperEmitter(db, basicProto)
 
-  store.listen(9901, function (err) {
+  emitter.listen(9901, function (err) {
     t.error(err, 'no error')
 
     var oldClose = db.close
@@ -485,23 +561,22 @@ test('no eventpeer if it is not needed', function (t) {
       return cb()
     }
 
-    store.close(function () {
+    emitter.close(function () {
       db.close = oldClose
-      store = new EventStore(db, basicProto)
+      emitter = new HyperEmitter(db, basicProto)
 
-      store.on('EventPeer', function (msg) {
+      emitter.on('EventPeer', function (msg) {
         t.fail('EventPeer should never be emitted')
       })
 
-      store.listen(9901, function (err) {
+      emitter.listen(9901, function (err) {
         t.error(err, 'no error')
 
         // wait some time for the event to be published
         setTimeout(function () {
-          store.close(t.pass.bind(t, 'closed successfully'))
+          emitter.close(t.pass.bind(t, 'closed successfully'))
         }, 50)
       })
     })
   })
-
 })

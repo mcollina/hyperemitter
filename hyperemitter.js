@@ -21,9 +21,9 @@ var defaults = {
   reconnectTimeout: 1000
 }
 
-function EventStore (db, schema, opts) {
-  if (!(this instanceof EventStore)) {
-    return new EventStore(db, schema, opts)
+function HyperEmitter (db, schema, opts) {
+  if (!(this instanceof HyperEmitter)) {
+    return new HyperEmitter(db, schema, opts)
   }
 
   this.messages = protobuf(schema)
@@ -70,7 +70,7 @@ function EventStore (db, schema, opts) {
     that._parallel(that, that._listeners[header.name] || [], event, next)
   }
 
-  // the status of this EventStore
+  // the status of this HyperEmitter
   this.status = new EventEmitter()
 
   this._server = net.createServer(function handle (stream) {
@@ -112,7 +112,7 @@ function EventStore (db, schema, opts) {
   })
 }
 
-EventStore.prototype.emit = function (name, data, cb) {
+HyperEmitter.prototype.emit = function (name, data, cb) {
   var encoder = headers[name] || this.messages[name]
   var err
 
@@ -132,7 +132,7 @@ EventStore.prototype.emit = function (name, data, cb) {
   return this
 }
 
-EventStore.prototype.on = function (name, callback) {
+HyperEmitter.prototype.on = function (name, callback) {
   var toInsert = callback
   this._listeners[name] = this._listeners[name] || []
   if (toInsert.length < 2) {
@@ -147,7 +147,7 @@ EventStore.prototype.on = function (name, callback) {
   return this
 }
 
-EventStore.prototype.removeListener = function (name, func) {
+HyperEmitter.prototype.removeListener = function (name, func) {
   if (func.wrapped) {
     func = func.wrapped
   }
@@ -156,7 +156,7 @@ EventStore.prototype.removeListener = function (name, func) {
   return this
 }
 
-EventStore.prototype.getId = function (cb) {
+HyperEmitter.prototype.getId = function (cb) {
   if (this.id) { return cb(null, this.id) }
 
   var that = this
@@ -216,7 +216,7 @@ function _connect (that, port, host, tries, cb) {
   })
 }
 
-EventStore.prototype.connect = function (port, host, cb) {
+HyperEmitter.prototype.connect = function (port, host, cb) {
   _connect(this, port, host, 1, cb)
 }
 
@@ -232,7 +232,7 @@ function localIps () {
   }, [])
 }
 
-EventStore.prototype.listen = function (port, address, cb) {
+HyperEmitter.prototype.listen = function (port, address, cb) {
   var that = this
 
   if (typeof address === 'function') {
@@ -272,7 +272,7 @@ EventStore.prototype.listen = function (port, address, cb) {
         }
 
         if (deepEqual(value, toStore)) {
-          return cb()
+          return cb(null, that._server.address())
         }
 
         that.emit('EventPeer', toStore, function (err) {
@@ -289,7 +289,7 @@ EventStore.prototype.listen = function (port, address, cb) {
   })
 }
 
-EventStore.prototype.stream = function (cb) {
+HyperEmitter.prototype.stream = function (opts) {
   var that = this
   var result = duplexify.obj()
   var input = through2.obj(function (chunk, enc, next) {
@@ -309,14 +309,20 @@ EventStore.prototype.stream = function (cb) {
       next()
     })
 
-    pump(that._hyperlog.createReadStream({ live: true }), filter)
+    var since = opts && opts.from === 'beginning' ? 0 : that._hyperlog.changes
+
+    pump(that._hyperlog.createReadStream({
+      since: since,
+      live: true
+    }), filter)
+
     result.setReadable(filter)
   })
 
   return result
 }
 
-EventStore.prototype.close = function (cb) {
+HyperEmitter.prototype.close = function (cb) {
   var that = this
 
   if (this._changes) {
@@ -344,4 +350,4 @@ function doClose (stuff, cb) {
   }
 }
 
-module.exports = EventStore
+module.exports = HyperEmitter
