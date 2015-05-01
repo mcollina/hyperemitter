@@ -338,7 +338,7 @@ HyperEmitter.prototype.close = function (cb) {
   Object.keys(this._clients).forEach(function (key) {
     toClose.unshift(that._clients[key])
   })
-  that._parallel(that, doClose, toClose, cb)
+  that._parallel(that, doClose, toClose, cb || function nop () {})
 }
 
 function doClose (stuff, cb) {
