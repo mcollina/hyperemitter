@@ -24,6 +24,10 @@
   ],
   "author": "Matteo Collina <hello@matteocollina.com>",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mcollina/hyperemitter.git"
+  },
   "devDependencies": {
     "faucet": "0.0.1",
     "minimist": "^1.1.1",
