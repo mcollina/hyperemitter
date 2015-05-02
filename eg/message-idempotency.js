@@ -1,7 +1,6 @@
-// - Emit Before On
-// This example demonstrates that events that are
-// emitted before a listener is added are still
-// sent to the listener.
+// - Message Idempotency
+// This example demonstrates that messages that
+// are structurally the same are idempotent.
 
 'use strict'
 
