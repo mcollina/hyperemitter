@@ -51,7 +51,7 @@ emitter.listen(9901, function (err) {
   var callCount = 0
   emitter.on('userAdded', function (msg) {
     ++callCount
-    console.log('userAdded', msg)
+    console.log('userAdded: ', msg)
   })
 
   // Remember only the first and last message will

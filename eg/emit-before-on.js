@@ -32,13 +32,13 @@ emitter.listen(9901, function (err) {
 
   // We are going to emit a message before anything
   // has subscribed. These messages will be stored.
-  emitter.emit('userAdded', userAddedMsg)
+  emitter.emit('userAdded: ', userAddedMsg)
 
   // The message sent before this subscription will
   // still be delivered here. Messages are received
   // in the order thant they are sent.
   emitter.on('userAdded', function (msg) {
-    console.log('userAdded', msg)
+    console.log('userAdded: ', msg)
     emitter.close()
   })
 })
