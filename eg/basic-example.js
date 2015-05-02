@@ -34,34 +34,28 @@ emitter.listen(9901, function (err) {
     id: 1
   }
 
-  // prove we called both subscribers.
-  var callCount = 0
-
   // Subscribe and handle any messages that match
   // the userAdded definition from the schema.
   emitter.on('userAdded', function (msg) {
-    ++callCount
     console.log('userAdded: ', msg)
   })
 
   // Subscribe and handle any messages that match
   // the userRemoved definition from the schema.
   emitter.on('userRemoved', function (msg) {
-    ++callCount
     console.log('userRemoved', msg)
   })
 
-  // emit both messages above.
+  // Emit both messages above.
   emitter.emit('userAdded', userAddedMsg)
   emitter.emit('userRemoved', userRemovedMsg)
 
-  // call count will be 2.
+  // Clean up the emitter.
   function complete () {
-    console.log('call count: ' + callCount)
     emitter.close()
   }
 
-  // we will wait for 500ms to see if more than one
-  // message is delivered to the subscribers above.
+  // We will wait for 500ms to
+  // let the program run/
   setTimeout(complete, 500)
 })

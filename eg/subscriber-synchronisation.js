@@ -1,6 +1,6 @@
-// - Message Idempotency
-// This example demonstrates that messages that
-// are structurally the same are idempotent.
+// - Subscribers Synchronisation
+// This example demonstrates that messages are sent to
+// all subscribers regardless of when the connect.
 
 'use strict'
 
@@ -31,43 +31,28 @@ emitter.listen(9901, function (err) {
     username: 'user'
   }
 
-  // Idempotency is structural based on the values. This
-  // message will not get through either.
-  var userAddedMsgDup = {
-    id: 1,
-    username: 'user'
-  }
-
-  // Optional values are taken into account. This message
-  // will get through as it is structurally unique.
-  var userAddedMsgAdditional = {
-    id: 1,
-    username: 'user',
-    name: 'anne'
-  }
-
-  // We expect the subscriber below to be called
-  // twice, one for each structurally unique mesage.
-  var callCount = 0
+  // Add the first handler. The second handler would
+  // not be called if this wasn't here. There needs
+  // to be at least one subscriber to have emit's
+  // callback raised.
   emitter.on('userAdded', function (msg) {
-    ++callCount
     console.log('userAdded: ', msg)
   })
 
-  // Remember only the first and last message will
-  // be sent on to the subscriber.
-  emitter.emit('userAdded', userAddedMsg)
-  emitter.emit('userAdded', userAddedMsg)
-  emitter.emit('userAdded', userAddedMsgDup)
-  emitter.emit('userAdded', userAddedMsgAdditional)
+  // Even though the second subsciber is added only after
+  // emit is called it still gets the messages once live.
+  emitter.emit('userAdded', userAddedMsg, function () {
+    emitter.on('userAdded', function (msg) {
+      console.log('userAdded: ', msg)
+    })
+  })
 
-  // call count will be 2.
+  // Cleanup
   function complete () {
-    console.log('call count: ' + callCount)
     emitter.close()
   }
 
-  // we will wait for 500ms to see if more than one
+  // We will wait for 500ms to see if more than one
   // message is delivered to the subscriber above.
   setTimeout(complete, 500)
 })
