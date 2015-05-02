@@ -62,6 +62,6 @@ emitter.listen(9901, function (err) {
   }
 
   // we will wait for 500ms to see if more than one
-  // message is delivered to the subscriber above.
+  // message is delivered to the subscribers above.
   setTimeout(complete, 500)
 })

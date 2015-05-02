@@ -9,12 +9,12 @@ var fs = require('fs')
 var path = require('path')
 
 // The emitter itself as well as an in memory
-// leveldb based store
+// leveldb based store. any leveldb store will do.
 var HyperEmitter = require('../hyperemitter')
 var buildDB = require('memdb')
 
 // create a new emitter using an in memory leveldb
-// use the exampleSchema.proto as the message schema.
+// use the example-schema.proto as the message schema.
 var schema = fs.readFileSync(path.join('.', 'example-schema.proto'))
 var emitter = new HyperEmitter(buildDB('a'), schema)
 
