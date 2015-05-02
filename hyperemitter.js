@@ -32,7 +32,7 @@ function HyperEmitter (db, schema, opts) {
   this._last = null
   this._opts = xtend(defaults, opts)
   this._listening = false
-  this._parallel = fastparallel()
+  this._parallel = fastparallel({ results: false })
   this._clients = {}
   this._lastClient = 0
   this._listeners = {}
