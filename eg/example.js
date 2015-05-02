@@ -31,6 +31,14 @@ var test2 = {
 
 var count = 2
 
+emitter1.emit('Test1', test1, function (err) {
+  assert(!err, 'no error')
+})
+
+emitter2.emit('Test2', test2, function (err) {
+  assert(!err, 'no error')
+})
+
 emitter2.on('Test1', function (msg) {
   assert.deepEqual(msg, test1, 'Test1 event matches')
   console.log('Test1', msg)
@@ -41,14 +49,6 @@ emitter1.on('Test2', function (msg) {
   assert.deepEqual(msg, test2, 'Test2 event matches')
   console.log('Test2', msg)
   release()
-})
-
-emitter1.emit('Test1', test1, function (err) {
-  assert(!err, 'no error')
-})
-
-emitter2.emit('Test2', test2, function (err) {
-  assert(!err, 'no error')
 })
 
 function release () {

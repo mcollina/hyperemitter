@@ -1,0 +1,10 @@
+message userAdded {
+  required int32 id = 1;
+  required string username = 2;
+  optional string name = 3;
+  optional string surname = 4;
+}
+
+message userRemoved {
+  required int32 id = 1;
+}

@@ -1,5 +1,5 @@
 var test = require('tape')
-var HyperEmitter = require('./')
+var HyperEmitter = require('../hyperemitter')
 var memdb = require('memdb')
 var fs = require('fs')
 var path = require('path')
