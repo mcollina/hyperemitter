@@ -5,102 +5,124 @@ folder.
 
 ## Table Of Contents
 
-  * <a href="#hyperemitter"><code>hyperemitter</code></a>
-  * <a href="#emit"><code>hyperemitter#<b>emit()</b></code></a>
-  * <a href="#on"><code>hyperemitter#<b>on()</b></code></a>
-  * <a href="#removeListener"><code>hyperemitter#<b>removeListener()</b></code></a>
-  * <a href="#connect"><code>hyperemitter#<b>connect()</b></code></a>
-  * <a href="#listen"><code>hyperemitter#<b>listen()</b></code></a>
-  * <a href="#messages"><code>hyperemitter#<b>messages</b></code></a>
-  * <a href="#stream"><code>hyperemitter#<b>stream()</b></code></a>
-  * <a href="#close"><code>hyperemitter#<b>close()</b></code></a>
+  * <a href="#hyperemitter">HyperEmitter</a>
+  * <a href="#emit">.emit()</a>
+  * <a href="#on">.on()</a>
+  * <a href="#removeListener">.removeListener()</a>
+  * <a href="#connect">.connect()</a>
+  * <a href="#listen">.listen()</a>
+  * <a href="#messages">.messages</a>
+  * <a href="#stream">.stream()</a>
+  * <a href="#close">.close()</a>
 
 <a name="hyperemitter"></a>
 ## HyperEmitter(db, schema, [opts])
-
-HyperEmitter is the class and function exposed by this module.
-It can be created by `HyperEmitter()` or using `new HyperEmitter()`.
-
-The `db` argument is a [levelup](http://npm.im/levelup) instance,
-something you can get from [level](http://npm.im/level) or
-[memdb](http://npm.im/memdb).
-
-The `schema` argument is a protocol buffer schema, like the following
-one:
+HyperEmitter is both the name of the module and of the function to be required. The function is actually
+a class or a class factory depending on how it is used. The code below shows both valid ways to get a
+new instance of HyperEmitter for use:
 
 ```
-message Hello {
-  optional string from = 1;
-  optional string message = 2;
-}
+var emitterOne = HyperEmmiter(someDb, someSchema)
+var emiiterTwo = new HyperEmitter(someDb, someSchema)
 ```
 
-An HyperEmitter accepts the following options:
+#### _db_
+The `db` argument accepts a [levelup](http://npm.im/levelup) instance, which in turn is powered by
+[leveldb](). We recommend [level](http://npm.im/level) for persistent storage and
+[memdb](http://npm.im/memdb) if you require an in memory store.
 
-- `reconnectTimeout`: the timeout that this instance will wait before
-  reconnecting to peers.
+#### _schema_
+The `schema` argument is a protocol buffer schema.
 
-A standard event is added to handle peer reconnections.
+#### _opts_
+The `opts` argument is an optional object that can be provided to configure the created instance. All
+available options are listed below.
 
-```
-message EventPeer {
-  required string id = 1;
-  repeated PeerAddress addresses = 2;
-
-  message PeerAddress {
-    required string ip = 1;
-    required int32 port = 2;
-  }
-}
-```
-
-An `HyperEmitter` will automatically reconnects to all known peers if
-started up again.
+- `reconnectTimeout`: the timeout that this instance will wait before reconnecting to peers.
 
 <a name="emit"></a>
-## emitter.emit(event, message, [callback])
+## .emit(event, message, [callback])
+Messages can be emitted from HyperEmitter using the `.emit()` method. This method takes the name of the
+event to be emitted and validates `message` against the schema before sending it off to any listening
+subscribers, in parallel. Once complete the `callback` function is called, if present.
 
-Emit the given message, which must be specified in the schema.
-`callback` will be called when the message has been added to the
-[hyperlog](http://npm.im/hyperlog).
+#### _event_
+The name of one of the message definitions from the provided schema.
+
+#### _message_
+Any object who's shape matches the named event. It's keys are validated against the schema.
+
+#### _callback_
+An optional function that will be called once the emitted message has been added to the log.
 
 <a name="on"></a>
-## emitter.on(event, callback(message[, done]))
+## .on(event, callback(message[, done]))
+Subscribes to and provides a function to be called each time and event is raised.
 
-Subscribe to the given event.
+#### _event_
+The name of the event being subscribed to.
+
+#### _callback_
+The function to be called when a new event is raised. The `message` arg holds the message emitted. The `done`
+arg can be used for letting the emitter know when the function has completed the handling of the event.
 
 <a name="removeListener"></a>
-## emitter.removeListener(event, callback(message[, done]))
+## .removeListener(event, callback(message[, done]))
+Removes the listener who matches the one provided. This method does not work with anonymous functions, only a
+function with a prior reference can be removed.
 
-The inverse of `on`.
+#### _event_
+The name of the event the listener is subscribed to.
+
+#### _callback_
+The reference of the function orginally used in the `.on` call.
 
 <a name="connect"></a>
-## emitter.connect(port, host[, done])
+## .connect(port, host[, done])
+Connects this HyperEmitter with another one which we call a peer. Peers can exist on other machines, HyperEmitter
+will communicate over TCP using the `host` and `port` provided. An optional function can be provided that will be
+called once the connection has been made.
 
-Connects to a given peer.
+#### _port_
+The port of the machine the peer to connect to resides on
+
+#### _host_
+The host of the machine the peer to connect to resides on.
+
+#### _done_
+A function to be called when connected.
 
 <a name="listen"></a>
-## emitter.listen(port[, host[, done]])
-
+## .listen(port[, host[, done]])
 Listen on a given port/host combination. An `EventPeer` event will be
 emitter.
 
+#### _port_
+The port to listen on.
+
+#### _host_
+The host to listen on.
+
+#### _done_
+An optional function to be called one listening has begun.
+
 <a name="messages"></a>
-## emitter.messages
+## .messages()
 
 The known messages, as returned by
 [protocol-buffers](http://npm.im/protocol-buffers).
 
 <a name="stream"></a>
-## emitter.stream([opts])
-
+## .stream([opts])
 A Duplex stream to emit and receive events.
 
-`stream()` supports the following options:
-
+#### _opts_
+An optional object of settings.
 - `from: 'beginning'` will return all the events from the beginning.
 
 <a name="close"></a>
-## emitter.close(callback())
-
+## .close(callback)
 Close the given __hyperemitter__. After, all `emit` will return an error.
+
+#### _callback_
+An optional function to be called when close has completed.
