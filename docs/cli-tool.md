@@ -1,8 +1,6 @@
 ## HyperEmitter - Using The CLI Tool
 HyperEmitter comes with a nice CLI to work with other remote HyperEmitter. Also, it is really useful for debugging.
 
-To get started, save the messages defined above in a file called `messages.proto`, and in a shell run:
-
 ```bash
 $ hypem --db db --port 1234 fixture/messages.proto
 listening on 1234 127.0.0.1
