@@ -580,3 +580,35 @@ test('no eventpeer if it is not needed', function (t) {
     })
   })
 })
+
+test('not idempotent', function (t) {
+  t.plan(5)
+
+  var emitter = new HyperEmitter(memdb(), basicProto)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var count = 2
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+    release()
+  })
+
+  function release () {
+    if (--count === 0) {
+      emitter.close(t.pass.bind(t, 'closed successfully'))
+    }
+  }
+})

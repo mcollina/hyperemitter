@@ -29,7 +29,6 @@ function HyperEmitter (db, schema, opts) {
   this.messages = protobuf(schema)
   this._db = db
   this._hyperlog = hyperlog(db)
-  this._last = null
   this._opts = xtend(defaults, opts)
   this._listening = false
   this._parallel = fastparallel({ results: false })
@@ -39,11 +38,6 @@ function HyperEmitter (db, schema, opts) {
   this._closed = false
 
   var that = this
-  this._hyperlog.heads(function (err, heads) {
-    if (err) { return that.status.emit('error', err) }
-
-    that._last = heads
-  })
 
   Object.keys(headers).forEach(function (header) {
     that.messages[header] = headers[header]
@@ -64,7 +58,6 @@ function HyperEmitter (db, schema, opts) {
   })
 
   function process (change, enc, next) {
-    that._last = change.key
     var header = headers.Event.decode(change.value)
     var event = that.messages[header.name].decode(header.payload)
     that._parallel(that, that._listeners[header.name] || [], event, next)
@@ -115,6 +108,7 @@ function HyperEmitter (db, schema, opts) {
 HyperEmitter.prototype.emit = function (name, data, cb) {
   var encoder = headers[name] || this.messages[name]
   var err
+  var that = this
 
   if (!encoder) {
     err = new Error('Non supported event')
@@ -127,7 +121,7 @@ HyperEmitter.prototype.emit = function (name, data, cb) {
     payload: encoder.encode(data)
   })
 
-  this._hyperlog.add(this._last, header, cb)
+  this._hyperlog.append(header, cb)
 
   return this
 }
