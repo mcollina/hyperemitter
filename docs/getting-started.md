@@ -1,1 +1,0 @@
-# HyperEmitter - Getting Started
