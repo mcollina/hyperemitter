@@ -4,7 +4,7 @@
   "description": "Horizontally Scalable EventEmitter powered by a Merkle DAG",
   "main": "hyperemitter.js",
   "scripts": {
-    "test": "tape test.js | faucet",
+    "test": "tape test/test.js | faucet",
     "lint": "standard"
   },
   "bin": {

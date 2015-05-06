@@ -108,7 +108,6 @@ function HyperEmitter (db, schema, opts) {
 HyperEmitter.prototype.emit = function (name, data, cb) {
   var encoder = headers[name] || this.messages[name]
   var err
-  var that = this
 
   if (!encoder) {
     err = new Error('Non supported event')
