@@ -26,7 +26,7 @@ npm install hyperemitter -g
 The example below can be found and ran from the [examples](./examples/) folder; it demonstrates
 how to connect two HyperEmitters together and send messages to both.
 
-``` javascript
+```javascript
 // - Multiple Connected Emitters
 // This example demonstrates connecting
 // multiple emitters together.
@@ -123,7 +123,7 @@ EventPeer {
 
 From here you can then use the provided REPL to work with HyperEmitter:
 
-```
+```javascript
 hyper.emit('Hello', { from: 'Matteo' })
 ```
 
@@ -157,7 +157,6 @@ As you can see the events are synced up! You can also export the data in
 
 ```
 $ hypem --no-repl --db db4 --target-port 1234 fixture/messages.proto
-```
 {"name":"EventPeer","payload":{"id":"ci94u8r4g0000hg1xruy56hqn","addresses":[{"ip":"localhost","port":1234}]}}
 {"name":"Hello","payload":{"from":"Matteo","message":""}}
 ```
