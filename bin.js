@@ -26,9 +26,9 @@ var argv = minimist(process.argv.splice(2), {
 })
 
 function usage () {
-  console.log('Usage: pes-client SCHEMA [--port PORT] [--host HOST]\n' +
-              '                  [--target-host HOST] [--target-port PORT]\n' +
-              '                  [--db PATH] [--no-repl] [--from-scratch]')
+  console.log('Usage: hypem <SCHEMA> [--schema SCHEMA] [--port PORT] [--host HOST]\n' +
+              '                      [--target-host HOST] [--target-port PORT]\n' +
+              '                      [--db PATH] [--no-repl] [--from-scratch]')
 }
 
 if (argv.help) {
@@ -36,14 +36,18 @@ if (argv.help) {
   process.exit(1)
 }
 
-if (!argv._[0]) {
+var messages = null
+if (argv._[0]) {
+  messages = fs.readFileSync(argv._[0])
+} else if (argv.schema) {
+  messages = fs.readFileSync(argv.schema)
+} else {
   console.error('Missing schema')
   console.log()
   usage()
   process.exit(1)
 }
 
-var messages = fs.readFileSync(argv._[0])
 var db = argv.db ? level(argv.db) : memdb()
 var hyper = require('./')(db, messages)
 var start = argv.repl ? startREPL : startStream
