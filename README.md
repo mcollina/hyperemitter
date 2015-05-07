@@ -298,12 +298,18 @@ A Duplex stream to emit and receive events.
 
   * `from:` The point in the stream to return events since. supports 'beginning'
 
+---
+
 <a name="close"></a>
 ### .close(callback)
 Close a given HyperEmitter. After, all `emit` will return an error.
 
  * ##### _callback_
+ 
  An optional function to be called when close has completed.
+
+
+---
 
 ## Contributing
 HyperEmitter is a mad science project and like all mad science project it requires mad scientists, the more
