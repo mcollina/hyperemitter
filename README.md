@@ -176,15 +176,15 @@ var emitterOne = Hyperemitter(someDb, someSchema)
 var emitterTwo = new HyperEmitter(someDb, someSchema)
 ```
 
- * ####_db_
+ * ##### _db_
  The `db` argument accepts a [levelup](http://npm.im/levelup) instance, which in turn is powered by
  [leveldb](). We recommend [level](http://npm.im/level) for persistent storage and
  [memdb](http://npm.im/memdb) if you require an in memory store.
 
- * #### _schema_
+ * ##### _schema_
  An string or stream that represents all of the messages to support in a given instance of HyperEmitter.
 
- * #### _opts_
+ * ##### _opts_
  An optional object that can be provided to configure the created instance. All available
  options are listed below.
 
@@ -218,13 +218,13 @@ Messages can be emitted from HyperEmitter using the `.emit()` method. This metho
 event to be emitted and validates `message` against the schema before sending it off to any listening
 subscribers, in parallel. Once complete the `callback` function is called, if present.
 
- * #### _event_
+ * ##### _event_
  The name of one of the message definitions from the provided schema.
 
- * #### _message_
+ * ##### _message_
  Any object who's shape matches the named event. It's keys are validated against the schema.
 
- * #### _callback_
+ * ##### _callback_
  An optional function that will be called once the emitted message has been added to the log.
 
 ---
@@ -233,10 +233,10 @@ subscribers, in parallel. Once complete the `callback` function is called, if pr
 ### .on(event, callback(message[, done]))
 Subscribes to and provides a function to be called each time and event is raised.
 
- * #### _event_
+ * ##### _event_
  The name of the event being subscribed to.
 
- * #### _callback_
+ * ##### _callback_
  The function to be called when a new event is raised. The `message` arg holds the message emitted. The
  `done` arg can be used for letting the emitter know when the function has completed the handling of
  the event.
@@ -248,10 +248,10 @@ Subscribes to and provides a function to be called each time and event is raised
 Removes the listener who matches the one provided. This method does not work with anonymous functions, only a
 function with a prior reference can be removed.
 
- * #### _event_
+ * ##### _event_
  The name of the event the listener is subscribed to.
 
- * #### _callback_
+ * ##### _callback_
  The reference of the function originally used in the `.on` call.
 
 ---
@@ -262,13 +262,13 @@ Connects this HyperEmitter with another one which we call a peer. Peers can exis
 will communicate over TCP using the `host` and `port` provided. An optional function can be provided that will be
 called once the connection has been made.
 
- * #### _port_
+ * ##### _port_
  The port of the machine the peer to connect to resides on
 
- * #### _host_
+ * ##### _host_
  The host of the machine the peer to connect to resides on.
 
- * #### _done_
+ * ##### _done_
  A function to be called when connected.
 
 ---
@@ -278,13 +278,13 @@ called once the connection has been made.
 Listen on a given port/host combination. An `EventPeer` event will be
 emitter.
 
- * #### _port_
+ * ##### _port_
  The port to listen on.
 
- * #### _host_
+ * ##### _host_
  The host to listen on.
 
- * #### _done_
+ * ##### _done_
  An optional function to be called one listening has begun.
 
 ---
@@ -293,7 +293,7 @@ emitter.
 ### .stream([opts])
 A Duplex stream to emit and receive events.
 
- * #### _opts_
+ * ##### _opts_
  An optional object of settings.
 
   * `from:` The point in the stream to return events since. supports 'beginning'
@@ -302,7 +302,7 @@ A Duplex stream to emit and receive events.
 ### .close(callback)
 Close a given HyperEmitter. After, all `emit` will return an error.
 
- * #### _callback_
+ * ##### _callback_
  An optional function to be called when close has completed.
 
 ## Contributing
