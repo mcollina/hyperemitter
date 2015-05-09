@@ -200,7 +200,7 @@ function _connect (that, port, host, tries, cb) {
       that.status.emit('connectionError', err, stream)
       if (!that._closed && tries < 10) {
         setTimeout(function () {
-          _connect(that, port, host, cb)
+          _connect(that, port, host, tries + 1, cb)
         }, that._opts.reconnectTimeout)
       } else {
         return cb ? cb(err) : undefined
