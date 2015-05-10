@@ -1,6 +1,6 @@
 {
   "name": "hyperemitter",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Horizontally Scalable EventEmitter powered by a Merkle DAG",
   "main": "hyperemitter.js",
   "scripts": {
