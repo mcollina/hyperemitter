@@ -6,7 +6,7 @@ var path = require('path')
 var basicProto = fs.readFileSync(path.join(__dirname, 'fixture', 'basic.proto'))
 
 test('standalone works', function (t) {
-  t.plan(7)
+  t.plan(5)
 
   var emitter = new HyperEmitter(memdb(), basicProto)
 
@@ -28,11 +28,6 @@ test('standalone works', function (t) {
 
   emitter.emit('Test2', test2, function (err) {
     t.error(err, 'no error')
-  })
-
-  emitter.emit('abcde', {}, function (err) {
-    t.ok(err, 'errors')
-    t.equal(err.message, 'Non supported event')
   })
 
   emitter.on('Test1', function (msg) {
