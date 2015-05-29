@@ -36,6 +36,7 @@
     "tape": "^4.0.0"
   },
   "dependencies": {
+    "bulk-write-stream": "^1.0.0",
     "cuid": "^1.2.4",
     "deep-equal": "^1.0.0",
     "duplexify": "^3.3.0",
