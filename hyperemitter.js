@@ -10,6 +10,7 @@ var os = require('os')
 var pump = require('pump')
 var fastparallel = require('fastparallel')
 var eos = require('end-of-stream')
+var bulkws = require('bulk-write-stream')
 var through2 = require('through2')
 var xtend = require('xtend')
 var duplexify = require('duplexify')
@@ -53,14 +54,18 @@ function HyperEmitter (db, schema, opts) {
     that._changes =
       pump(
         that._hyperlog.createReadStream({ since: that._hyperlog.changes, live: true }),
-        through2.obj(process)
+        bulkws.obj(process)
       )
   })
 
-  function process (change, enc, next) {
+  function process (changes, next) {
+    that._parallel(that, deliver, changes, next)
+  }
+
+  function deliver (change, done) {
     var header = headers.Event.decode(change.value)
-    var event = that.messages[header.name].decode(header.payload)
-    that._parallel(that, that._listeners[header.name] || [], event, next)
+    var event = this.messages[header.name].decode(header.payload)
+    this._parallel(this, this._listeners[header.name] || [], event, done)
   }
 
   // the status of this HyperEmitter
