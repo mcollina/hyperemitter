@@ -348,7 +348,7 @@ test('automatically reconnects', function (t) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
     // using internal data to fake a connection failure
-    emitter2._clients['127.0.0.1:9901'].destroy()
+    emitter2._peers['127.0.0.1:9901'].destroy()
 
     setImmediate(function () {
       emitter1.emit('Test2', test2, function (err) {

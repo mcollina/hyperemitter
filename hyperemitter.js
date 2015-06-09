@@ -6,6 +6,7 @@ var os = require('os')
 var pump = require('pump')
 var fastparallel = require('fastparallel')
 var eos = require('end-of-stream')
+var bulkws = require('bulk-write-stream')
 var through2 = require('through2')
 var xtend = require('xtend')
 var duplexify = require('duplexify')
@@ -42,16 +43,23 @@ function createChangeStream () {
     live: true
   })
 
-  var that = this
-  return pump(readStream, through2.obj(function (change, enc, next) {
-    var container = that.codecs.Event.decode(change.value)
-    var name = container.name
-    var decoder = that.codecs[name]
-    var event = container.payload
+  return pump(readStream, bulkws.obj(processStream.bind(this)))
+}
 
-    if (decoder) event = decoder.decode(event)
-    that._parallel(that, that._listeners[name] || [], event, next)
-  }))
+function processStream (changes, next) {
+  var that = this
+
+  that._parallel(that, publish, changes, next)
+}
+
+function publish (change, done) {
+  var container = this.codecs.Event.decode(change.value)
+  var name = container.name
+  var decoder = this.codecs[name]
+  var event = container.payload
+
+  if (decoder) event = decoder.decode(event)
+  this._parallel(this, this._listeners[name] || [], event, done)
 }
 
 function createServer () {
@@ -104,7 +112,7 @@ function connectToPeer (that, port, host, tries, callback) {
 
     that._db.put(PEERS, JSON.stringify(peers), function (err) {
       if (callback) {
-        callback(err) // what to do if callback is not specified?
+        callback(err)
         callback = null
       }
     })
