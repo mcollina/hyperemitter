@@ -3,7 +3,8 @@
 HyperEmitter is a horizontally scalable __and__ persistent EventEmitter powered by a [Merkle DAG](http://npm.im/hyperlog).
 (Yes, it's like a blockchain). In other contexts, this concept is also called an EventStore. HyperEmitter
 uses [protocol-buffers](https://developers.google.com/protocol-buffers/), specifically
-[mafintosh's](https://github.com/mafintosh/protocol-buffers) implementation, for handling message schemas.
+[mafintosh's](https://github.com/mafintosh/protocol-buffers) implementation, for handling message schemas,
+although custom codecs are also supported.
 
 > This module is __highly experimental__, __possibly under-perfoming__, and __may have bugs__, use with
 > caution. On the other end, if the thought of a persistent, horizontally scaleable EventStore gets you
@@ -157,6 +158,7 @@ folder.
 
   * <a href="#hyperemitter">HyperEmitter</a>
   * <a href="#messages">.messages</a>
+  * <a href="#registerCodec">.registerCodec()</a>
   * <a href="#emit">.emit()</a>
   * <a href="#on">.on()</a>
   * <a href="#removeListener">.removeListener()</a>
@@ -226,6 +228,23 @@ subscribers, in parallel. Once complete the `callback` function is called, if pr
 
  * ##### _callback_
  An optional function that will be called once the emitted message has been added to the log.
+
+---
+
+### .registerCodec(name, codec | codecs) <a name="registerCoded"></a>
+Custom codecs can be registered as long as they have both an `encode` and `decode` methods. Codecs
+are keyed by message name. For ease of use registration params can be provided as params (name,
+codec), an object, or an array of `{name: '', codec: obj}`. Only once codec can be registered against
+one message at any given time.
+
+ * ##### _name_
+ The name of one of the message message this codec handles.
+
+ * ##### _codec_
+ Any object which has an `encode` and `decode` method.
+
+ * ##### _codecs_
+ An object or string which represents a collection of codecs and their names.
 
 ---
 
@@ -305,7 +324,7 @@ A Duplex stream to emit and receive events.
 Close a given HyperEmitter. After, all `emit` will return an error.
 
  * ##### _callback_
- 
+
  An optional function to be called when close has completed.
 
 

@@ -26,6 +26,8 @@ var protobuf = require('protocol-buffers')
 var coreCodecs = protobuf(fs.readFileSync(path.join(__dirname, 'codecs.proto')))
 
 function initializeCodecs (codecs) {
+  codecs = codecs || []
+
   if (Buffer.isBuffer(codecs) || typeof codecs === 'string') {
     codecs = protobuf(codecs)
   }
@@ -240,14 +242,24 @@ HyperEmitter.prototype.on = function (name, handler) {
 HyperEmitter.prototype.registerCodec = function (name, codec) {
   if (typeof name === 'string') {
     this.codecs[name] = codec
-    return
+    return this
   }
 
-  if (Array.isArray(name)) {
-    var that = this
-    name.forEach(function (set) {
-      that.codecs[set.name] = set.codec
+  var codecs = name
+  var that = this
+
+  if (Array.isArray(codecs)) {
+    codecs.forEach(function (element) {
+      that.codecs[element.name] = element.codec
     })
+    return that
+  }
+
+  if (typeof codecs === 'object') {
+    Object.keys(codecs).forEach(function (name) {
+      that.codecs[name] = codecs[name]
+    })
+    return that
   }
 
   return this
