@@ -1,12 +1,14 @@
 var test = require('tape')
 var HyperEmitter = require('../hyperemitter')
+var protobuf = require('protocol-buffers')
 var memdb = require('memdb')
+
 var fs = require('fs')
 var path = require('path')
 var basicProto = fs.readFileSync(path.join(__dirname, 'fixture', 'basic.proto'))
 
 test('standalone works', function (t) {
-  t.plan(7)
+  t.plan(5)
 
   var emitter = new HyperEmitter(memdb(), basicProto)
 
@@ -30,11 +32,6 @@ test('standalone works', function (t) {
     t.error(err, 'no error')
   })
 
-  emitter.emit('abcde', {}, function (err) {
-    t.ok(err, 'errors')
-    t.equal(err.message, 'Non supported event')
-  })
-
   emitter.on('Test1', function (msg) {
     t.deepEqual(msg, test1, 'Test1 event matches')
     release()
@@ -45,6 +42,145 @@ test('standalone works', function (t) {
 
     // second argument can be a function, backpressure is supported
     cb()
+    release()
+  })
+
+  function release () {
+    if (--count === 0) {
+      emitter.close(t.pass.bind(t, 'closed successfully'))
+    }
+  }
+})
+
+test('using registerCodec works', function (t) {
+  t.plan(5)
+
+  var codecs = protobuf(basicProto)
+  var emitter = new HyperEmitter(memdb())
+
+  emitter.registerCodec('Test1', codecs.Test1)
+         .registerCodec('Test2', codecs.Test2)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  var count = 2
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.emit('Test2', test2, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+    release()
+  })
+
+  emitter.on('Test2', function (msg) {
+    t.deepEqual(msg, test2, 'Test2 event matches')
+    release()
+  })
+
+  function release () {
+    if (--count === 0) {
+      emitter.close(t.pass.bind(t, 'closed successfully'))
+    }
+  }
+})
+
+test('registerCodec supports objects', function (t) {
+  t.plan(5)
+
+  var codecs = protobuf(basicProto)
+  var emitter = new HyperEmitter(memdb())
+
+  emitter.registerCodec(codecs)
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  var count = 2
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.emit('Test2', test2, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+    release()
+  })
+
+  emitter.on('Test2', function (msg) {
+    t.deepEqual(msg, test2, 'Test2 event matches')
+    release()
+  })
+
+  function release () {
+    if (--count === 0) {
+      emitter.close(t.pass.bind(t, 'closed successfully'))
+    }
+  }
+})
+
+test('registerCodec supports arrays', function (t) {
+  t.plan(5)
+
+  var codecs = protobuf(basicProto)
+  var emitter = new HyperEmitter(memdb())
+
+  emitter.registerCodec([
+    {name: 'Test1', codec: codecs.Test1},
+    {name: 'Test2', codec: codecs.Test2}
+  ])
+
+  var test1 = {
+    foo: 'hello',
+    num: 42
+  }
+
+  var test2 = {
+    bar: 'world',
+    id: 23
+  }
+
+  var count = 2
+
+  emitter.emit('Test1', test1, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.emit('Test2', test2, function (err) {
+    t.error(err, 'no error')
+  })
+
+  emitter.on('Test1', function (msg) {
+    t.deepEqual(msg, test1, 'Test1 event matches')
+    release()
+  })
+
+  emitter.on('Test2', function (msg) {
+    t.deepEqual(msg, test2, 'Test2 event matches')
     release()
   })
 
@@ -353,7 +489,7 @@ test('automatically reconnects', function (t) {
     t.deepEqual(msg, test1, 'Test1 event matches')
 
     // using internal data to fake a connection failure
-    emitter2._clients['127.0.0.1:9901'].destroy()
+    emitter2._peers['127.0.0.1:9901'].destroy()
 
     setImmediate(function () {
       emitter1.emit('Test2', test2, function (err) {

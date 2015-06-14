@@ -1,8 +1,4 @@
 var EventEmitter = require('events').EventEmitter
-var fs = require('fs')
-var path = require('path')
-var protobuf = require('protocol-buffers')
-var headers = protobuf(fs.readFileSync(path.join(__dirname, 'headers.proto')))
 var hyperlog = require('hyperlog')
 var net = require('net')
 var cuid = require('cuid')
@@ -15,6 +11,8 @@ var through2 = require('through2')
 var xtend = require('xtend')
 var duplexify = require('duplexify')
 var deepEqual = require('deep-equal')
+var noop = function () {}
+
 var STOREID = '!!STOREID!!'
 var PEERS = '!!PEERS!!'
 var MYEVENTPEER = '!!MYEVENTPEER!!'
@@ -22,126 +20,248 @@ var defaults = {
   reconnectTimeout: 1000
 }
 
-function HyperEmitter (db, schema, opts) {
-  if (!(this instanceof HyperEmitter)) {
-    return new HyperEmitter(db, schema, opts)
+var fs = require('fs')
+var path = require('path')
+var protobuf = require('protocol-buffers')
+var coreCodecs = protobuf(fs.readFileSync(path.join(__dirname, 'codecs.proto')))
+
+function initializeCodecs (codecs) {
+  codecs = codecs || []
+
+  if (Buffer.isBuffer(codecs) || typeof codecs === 'string') {
+    codecs = protobuf(codecs)
   }
 
-  this.messages = protobuf(schema)
-  this._db = db
-  this._hyperlog = hyperlog(db)
-  this._opts = xtend(defaults, opts)
-  this._listening = false
-  this._parallel = fastparallel({ results: false })
-  this._clients = {}
-  this._lastClient = 0
-  this._listeners = {}
-  this._closed = false
+  Object.keys(coreCodecs).forEach(function (name) {
+    codecs[name] = coreCodecs[name]
+  })
 
+  return codecs
+}
+
+function createChangeStream () {
+  var readStream = this._hyperlog.createReadStream({
+    since: this._hyperlog.changes,
+    live: true
+  })
+
+  return pump(readStream, bulkws.obj(processStream.bind(this)))
+}
+
+function processStream (changes, next) {
   var that = this
 
-  Object.keys(headers).forEach(function (header) {
-    that.messages[header] = headers[header]
-  })
+  that._parallel(that, publish, changes, next)
+}
 
-  this._hyperlog.ready(function () {
-    if (that._closed) {
-      return
-    }
+function publish (change, done) {
+  var container = this.codecs.Event.decode(change.value)
+  var name = container.name
+  var decoder = this.codecs[name]
+  var event = container.payload
 
-    that.status.emit('ready')
+  if (decoder) event = decoder.decode(event)
+  this._parallel(this, this._listeners[name] || [], event, done)
+}
 
-    that._changes =
-      pump(
-        that._hyperlog.createReadStream({ since: that._hyperlog.changes, live: true }),
-        bulkws.obj(process)
-      )
-  })
+function createServer () {
+  var that = this
 
-  function process (changes, next) {
-    that._parallel(that, deliver, changes, next)
-  }
+  this._server = net.createServer(function (peerStream) {
+    that.status.emit('peerConnected')
 
-  function deliver (change, done) {
-    var header = headers.Event.decode(change.value)
-    var event = this.messages[header.name].decode(header.payload)
-    this._parallel(this, this._listeners[header.name] || [], event, done)
-  }
-
-  // the status of this HyperEmitter
-  this.status = new EventEmitter()
-
-  this._server = net.createServer(function handle (stream) {
-    that.status.emit('clientConnected')
-
-    var id = that._lastClient++
-    var replicate = that._hyperlog.replicate({ live: true })
-    var result = pump(stream, replicate, stream, function (err) {
-      if (err) { return that.status.emit('clientError', err) }
-      delete that._clients[id]
+    var peerId = that._lastPeerId++
+    var localStream = that._hyperlog.replicate({live: true})
+    var boundStreams = pump(peerStream, localStream, peerStream, function (err) {
+      if (err) that.status.emit('peerError', err)
+      else delete that._peers[peerId]
     })
 
-    that._clients[id] = result
-  })
-
-  this.on('EventPeer', function (peer, cb) {
-    if (peer.id !== peer.id) {
-      that.connect(peer.addresses[0].port, peer.addresses[0].ip, cb)
-    } else {
-      cb()
-    }
-  })
-
-  this._db.get(PEERS, function (err, value) {
-    if (err && !err.notFound) {
-      return that.status.emit('error', err)
-    }
-
-    if (err && err.notFound) {
-      // nothing to do
-      return
-    }
-
-    value = JSON.parse(value)
-
-    that._parallel(that, function (peer, cb) {
-      that.connect(peer.port, peer.address, cb)
-    }, value, function () {})
+    that._peers[peerId] = boundStreams
   })
 }
 
-HyperEmitter.prototype.emit = function (name, data, cb) {
-  var encoder = headers[name] || this.messages[name]
-  var err
+function getLocalAddresses () {
+  var ifaces = os.networkInterfaces()
+  return Object.keys(ifaces).reduce(function (addresses, iface) {
+    return ifaces[iface].filter(function (ifaceIp) {
+      return !ifaceIp.internal
+    }).reduce(function (addresses, ifaceIp) {
+      addresses.push(ifaceIp)
+      return addresses
+    }, addresses)
+  }, [])
+}
 
-  if (!encoder) {
-    err = new Error('Non supported event')
-    if (cb) { return cb(err) }
-    else throw err
+function connectToPeer (that, port, host, tries, callback) {
+  var stream = net.connect(port, host)
+  var key = host + ':' + port
+
+  if (that._peers[key]) {
+    return callback ? callback() : undefined
   }
 
-  var header = headers.Event.encode({
-    name: name,
-    payload: encoder.encode(data)
+  that._peers[key] = stream
+
+  stream.on('connect', function () {
+    var replicate = that._hyperlog.replicate({ live: true })
+    pump(replicate, stream, replicate)
+
+    var peers = Object.keys(that._peers).map(function (key) {
+      var split = key.split(':')
+      return { address: split[0], port: split[1] }
+    })
+
+    that._db.put(PEERS, JSON.stringify(peers), function (err) {
+      if (callback) {
+        callback(err)
+        callback = null
+      }
+    })
   })
 
-  this._hyperlog.append(header, cb)
+  eos(stream, function (err) {
+    delete that._peers[key]
+    if (err) {
+      that.status.emit('connectionError', err, stream)
+      if (!that._closed && tries < 10) {
+        setTimeout(function () {
+          connectToPeer(that, port, host, tries + 1, callback)
+        }, that._opts.reconnectTimeout)
+      } else {
+        return callback ? callback(err) : undefined
+      }
+    }
+  })
+}
+
+function connectToKnownPeers () {
+  var that = this
+
+  this._db.get(PEERS, function (err, peers) {
+    if (err && err.notFound) return
+    if (err) return that.status.emit('error', err)
+
+    function connectToPeer (peer, next) {
+      that.connect(peer.port, peer.address, next)
+    }
+
+    that._parallel(that, connectToPeer, JSON.parse(peers), noop)
+  })
+}
+
+function handleNewPeers () {
+  var that = this
+
+  this.on('EventPeer', function (peer, callback) {
+    var port = peer.addresses[0].port
+    var address = peer.addresses[0].ip
+
+    if (peer.id !== peer.id) that.connect(port, address, callback)
+    else callback()
+  })
+}
+
+function destroyOrClose (resource, callback) {
+  if (resource.destroy) {
+    resource.destroy()
+    setImmediate(callback)
+  } else {
+    resource.close(callback)
+  }
+}
+
+function HyperEmitter (db, codecs, opts) {
+  if (!(this instanceof HyperEmitter)) {
+    return new HyperEmitter(db, codecs, opts)
+  }
+
+  this._opts = xtend(defaults, opts)
+  this._parallel = fastparallel({ results: false })
+  this._db = db
+  this._hyperlog = hyperlog(db)
+
+  this._closed = false
+  this._listening = false
+
+  this._peers = {}
+  this._lastPeerId = 0
+  this._listeners = {}
+
+  this.status = new EventEmitter()
+  this.codecs = initializeCodecs(codecs)
+  this.messages = this.codecs
+
+  createServer.call(this)
+  connectToKnownPeers.call(this)
+  handleNewPeers.call(this)
+
+  var that = this
+  this._hyperlog.ready(function () {
+    if (that._closed) return
+
+    that.changeStream = createChangeStream.call(that)
+    that.changes = that.changeStream
+    that.status.emit('ready')
+  })
+
+}
+
+HyperEmitter.prototype.emit = function (name, data, callback) {
+  var encoder = this.codecs[name]
+
+  if (encoder) data = encoder.encode(data)
+  var container = this.codecs.Event.encode({
+    name: name,
+    payload: data
+  })
+
+  this._hyperlog.append(container, callback)
 
   return this
 }
 
-HyperEmitter.prototype.on = function (name, callback) {
-  var toInsert = callback
-  this._listeners[name] = this._listeners[name] || []
+HyperEmitter.prototype.on = function (name, handler) {
+  var toInsert = handler
+
   if (toInsert.length < 2) {
-    toInsert = function (msg, cb) {
-      callback(msg)
-      cb()
+    toInsert = function (msg, callback) {
+      handler(msg)
+      callback()
     }
 
-    callback.wrapped = toInsert
+    handler.wrapped = toInsert
   }
+
+  this._listeners[name] = this._listeners[name] || []
   this._listeners[name].push(toInsert)
+
+  return this
+}
+
+HyperEmitter.prototype.registerCodec = function (name, codec) {
+  if (typeof name === 'string') {
+    this.codecs[name] = codec
+    return this
+  }
+
+  var codecs = name
+  var that = this
+
+  if (Array.isArray(codecs)) {
+    codecs.forEach(function (element) {
+      that.codecs[element.name] = element.codec
+    })
+    return that
+  }
+
+  if (typeof codecs === 'object') {
+    Object.keys(codecs).forEach(function (name) {
+      that.codecs[name] = codecs[name]
+    })
+    return that
+  }
+
   return this
 }
 
@@ -154,87 +274,33 @@ HyperEmitter.prototype.removeListener = function (name, func) {
   return this
 }
 
-HyperEmitter.prototype.getId = function (cb) {
-  if (this.id) { return cb(null, this.id) }
+HyperEmitter.prototype.getId = function (callback) {
+  if (this.id) { return callback(null, this.id) }
 
   var that = this
   var db = this._db
 
   db.get(STOREID, function (err, value) {
-    if (err && !err.notFound) { return cb(err) }
+    if (err && !err.notFound) { return callback(err) }
     that.id = value || cuid()
     db.put(STOREID, that.id, function (err) {
       if (err) {
-        return cb(err)
+        return callback(err)
       }
-      cb(null, that.id)
+      callback(null, that.id)
     })
   })
 }
 
-function _connect (that, port, host, tries, cb) {
-  var stream = net.connect(port, host)
-  var key = host + ':' + port
-
-  if (that._clients[key]) {
-    return cb ? cb() : undefined
-  }
-
-  that._clients[key] = stream
-
-  stream.on('connect', function () {
-    var replicate = that._hyperlog.replicate({ live: true })
-    pump(replicate, stream, replicate)
-
-    var peers = Object.keys(that._clients).map(function (key) {
-      var split = key.split(':')
-      return { address: split[0], port: split[1] }
-    })
-
-    that._db.put(PEERS, JSON.stringify(peers), function (err) {
-      if (cb) {
-        cb(err) // what to do if cb is not specified?
-        cb = null
-      }
-    })
-  })
-
-  eos(stream, function (err) {
-    delete that._clients[key]
-    if (err) {
-      that.status.emit('connectionError', err, stream)
-      if (!that._closed && tries < 10) {
-        setTimeout(function () {
-          _connect(that, port, host, tries + 1, cb)
-        }, that._opts.reconnectTimeout)
-      } else {
-        return cb ? cb(err) : undefined
-      }
-    }
-  })
+HyperEmitter.prototype.connect = function (port, host, callback) {
+  connectToPeer(this, port, host, 1, callback)
 }
 
-HyperEmitter.prototype.connect = function (port, host, cb) {
-  _connect(this, port, host, 1, cb)
-}
-
-function localIps () {
-  var ifaces = os.networkInterfaces()
-  return Object.keys(ifaces).reduce(function (addresses, iface) {
-    return ifaces[iface].filter(function (ifaceIp) {
-      return !ifaceIp.internal
-    }).reduce(function (addresses, ifaceIp) {
-      addresses.push(ifaceIp)
-      return addresses
-    }, addresses)
-  }, [])
-}
-
-HyperEmitter.prototype.listen = function (port, address, cb) {
+HyperEmitter.prototype.listen = function (port, address, callback) {
   var that = this
 
   if (typeof address === 'function') {
-    cb = address
+    callback = address
     address = null
   }
 
@@ -242,15 +308,15 @@ HyperEmitter.prototype.listen = function (port, address, cb) {
 
   this.getId(function (err, id) {
     if (err) {
-      return cb(err)
+      return callback(err)
     }
 
     that._server.listen(port, address, function (err) {
       if (err) {
-        return cb(err)
+        return callback(err)
       }
 
-      var addresses = address ? [{ address: address }] : localIps()
+      var addresses = address ? [{ address: address }] : getLocalAddresses()
 
       addresses = addresses.map(function (ip) {
         return {
@@ -266,20 +332,20 @@ HyperEmitter.prototype.listen = function (port, address, cb) {
 
       that._db.get(MYEVENTPEER, { valueEncoding: 'json' }, function (err, value) {
         if (err && !err.notFound) {
-          return cb(err)
+          return callback(err)
         }
 
         if (deepEqual(value, toStore)) {
-          return cb(null, that._server.address())
+          return callback(null, that._server.address())
         }
 
         that.emit('EventPeer', toStore, function (err) {
-          if (err) { return cb(err) }
+          if (err) { return callback(err) }
 
           that._db.put(MYEVENTPEER, JSON.stringify(toStore), function (err) {
-            if (err) { return cb(err) }
+            if (err) { return callback(err) }
 
-            cb(null, that._server.address())
+            callback(null, that._server.address())
           })
         })
       })
@@ -298,12 +364,18 @@ HyperEmitter.prototype.stream = function (opts) {
 
   that._hyperlog.ready(function () {
     var filter = through2.obj(function (change, enc, next) {
-      var header = headers.Event.decode(change.value)
-      var event = that.messages[header.name].decode(header.payload)
+      var container = that.codecs.Event.decode(change.value)
+      var name = container.name
+      var decoder = that.codecs[name]
+      var event = container.payload
+
+      if (decoder) event = decoder.decode(event)
+
       this.push({
-        name: header.name,
+        name: name,
         payload: event
       })
+
       next()
     })
 
@@ -320,32 +392,19 @@ HyperEmitter.prototype.stream = function (opts) {
   return result
 }
 
-HyperEmitter.prototype.close = function (cb) {
+HyperEmitter.prototype.close = function (callback) {
+  var resources = [this._db]
+
+  if (this.changeStream) resources.push(this.changeStream)
+  if (this._listening) resources.push(this._server)
+
   var that = this
-
-  if (this._changes) {
-    this._changes.destroy()
-  }
-
-  var toClose = [that._db]
-  if (that._listening) {
-    toClose.push(that._server)
-  }
-  this._closed = true
-
-  Object.keys(this._clients).forEach(function (key) {
-    toClose.unshift(that._clients[key])
+  Object.keys(this._peers).forEach(function (peerId) {
+    resources.unshift(that._peers[peerId])
   })
-  that._parallel(that, doClose, toClose, cb || function nop () {})
-}
 
-function doClose (stuff, cb) {
-  if (stuff.close) {
-    stuff.close(cb)
-  } else {
-    stuff.destroy()
-    setImmediate(cb)
-  }
+  this._closed = true
+  this._parallel(this, destroyOrClose, resources, callback || noop)
 }
 
 module.exports = HyperEmitter

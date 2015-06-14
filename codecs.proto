@@ -12,4 +12,3 @@ message EventPeer {
     required int32 port = 2;
   }
 }
-
