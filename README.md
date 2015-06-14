@@ -230,7 +230,7 @@ subscribers, in parallel. Once complete the `callback` function is called, if pr
 
 ---
 
-### .registerCodec(name, codec | codecs) <a name="registerCoded"></a>
+### .registerCodec(name, codec | codecs) <a name="registerCodec"></a>
 Custom codecs can be registered as long as they have both an `encode` and `decode` method. Codecs
 are keyed by message name. For ease of use registration params can be provided as args (name,
 codec), an object, or an array of `{name: '', codec: obj}`. Only once codec can be registered against one message at any given time.
