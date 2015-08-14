@@ -204,6 +204,7 @@ function HyperEmitter (db, codecs, opts) {
     that.changes = that.changeStream
     that.status.emit('ready')
   })
+
 }
 
 HyperEmitter.prototype.emit = function (name, data, callback) {
