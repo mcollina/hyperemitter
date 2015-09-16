@@ -1,6 +1,6 @@
-# HyperEmitter - Contributing
-HyperEmitter is a mad science project and as such requires mad scientists, the more the merrier! We
-actively encourage people of any skill level to fork this project and contribute where possible.
+# Contributing
+Hyperemitter is an __open project__ and encourages participation. If you feel you can help in any way,
+be it with examples, extra testing, or new features please be our guest.
 
 ## Helping out
 Contributing is not always about adding new features, there are plenty of other ways to get
@@ -8,13 +8,11 @@ involved, for instance:
 
 - add more tests, unit or performance based.
 - write guides and documentation or proof-read and fix existing ones.
-- work with contributors to create a logo and social media assets.
 - report, find and/or fix bugs.
 - add examples of usage, patterns or integration with other tools.
-- create a static site which feeds from docs and examples
 
-Like any other repositories there is plenty to be done for people of all skill levels and
-specialities.
+Like any other repository there is plenty to be done for people of all skill levels and
+specialities, if you have any questions, simply open an issue on our [Issues Board][].
 
 ## Obtaining the Source
 In order to obtain the source for HyperEmitter we first suggest you clone it in Github. After this
@@ -37,19 +35,22 @@ npm install
 ```
 
 ## Running Tests and Linting
-HyperEmitter's tests are written using [Tape](https://www.npmjs.com/package/tape), a TAP compliant testing
-module. Tests are located in the `/test` folder and can be ran with the following command:
+HyperEmitter's tests are written using [Tape][], a [TAP][] compliant testing module, [Faucet][]
+is used to pretty print the TAP stream. Tests are located in the `/test` folder and can be
+ran with the following command:
 
 ```
 npm run test
 ```
 
-For linting and related checks, HyperEmitter users [JSStandard](https://www.npmjs.com/package/standard).
-Linting can be performed with the following command:
+For linting and related checks, HyperEmitter users [JSStandard][]. Linting can be performed with the
+following command:
 
 ```
 npm run lint
 ```
+
+In both cases, results are outputted to the console window.
 
 ## Making a Contribution
 If you have something you would like to contribute first ensure your master branch is up to date with
@@ -66,7 +67,7 @@ Next, create a branch for your contribution:
 git checkout -b name-of-my-branch
 ```
 
-HyperEmitter uses [precommit](https://www.npmjs.com/package/pre-commit) to ensure that tests pass and your
+HyperEmitter uses [Precommit][] to ensure that tests pass and your
 code is linted before allowing a commit to be created. Unfortunately this means most visual git tools will
 not allow commits. To create a commit at the command line simply do:
 
@@ -97,5 +98,17 @@ git rebase master
 git push -f origin name-of-my-branch
 ```
 
-Finally navigate to your fork on github. You should see a small marker to create a pull request, just above the repo
-explorer. Make sure you add some information along with your pull request, it makes reviewing it easier.
+Finally navigate to your fork on github. You should see a small marker to create a pull request, just
+above the repo explorer. Make sure you add some information along with your pull request, it makes
+reviewing it easier.
+
+## Got Questions
+If you have any issues or need any help please reach out to [@matteocollina][Twitter].
+
+[Issues Board]: https://github.com/mcollina/hyperemitter/issues
+[Tape]: https://www.npmjs.com/package/tape
+[TAP]: https://testanything.org/
+[JSStandard]: https://www.npmjs.com/package/standard
+[Precommit]: https://www.npmjs.com/package/pre-commit
+[Faucet]: https://www.npmjs.com/package/faucet
+[Twitter]: https://twitter.com/matteocollina
