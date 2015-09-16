@@ -1,6 +1,6 @@
 # Contributing
-Hyperemitter is an __open project__ and encourages participation. If you feel you can help in any way,
-be it with examples, extra testing, or new features please be our guest.
+Hyperemitter is an __mad science__ project and encourages participation. If you feel you can help in any
+way, be it with examples, extra testing, or new features please be our guest.
 
 ## Helping out
 Contributing is not always about adding new features, there are plenty of other ways to get
