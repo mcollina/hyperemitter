@@ -137,7 +137,7 @@ function noOutputEval (cmd, context, filename, callback) {
   if (!err) {
     try {
       script.runInContext(context, { displayErrors: false })
-    } catch(e) {
+    } catch (e) {
       err = e
     }
   }
