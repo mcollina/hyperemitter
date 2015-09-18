@@ -331,7 +331,7 @@ Close a given HyperEmitter. After, all `emit` will return an error.
 ## Contributing
 HyperEmitter is a mad science project and like all mad science project it requires mad scientists, the more
 the merrier! If you feel you can help in any way, be it with examples, extra testing, or new features please
-be our guest. See our [Contribution Guide]() for information on obtaining the source and an overview of the
+be our guest. See our [Contribution Guide](./CONTRIBUTING.md) for information on obtaining the source and an overview of the
 tooling used.
 
 [![js*standard-style](https://raw.githubusercontent.com/feross/standard/master/badge.png)](https://github.com/feross/standard)
